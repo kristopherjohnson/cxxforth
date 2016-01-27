@@ -1,0 +1,7 @@
+#ifndef forthconfig_hpp_included
+#define forthconfig_hpp_included
+
+#cmakedefine CONFIG_SKIP_RUNTIME_CHECKS
+
+#endif // forthconfig_hpp_included
+

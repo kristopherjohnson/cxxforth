@@ -11,7 +11,7 @@ all: $(BUILDDIR)/Makefile
 
 $(BUILDDIR)/Makefile: CMakeLists.txt
 	$(MKDIR) -p $(BUILDDIR)
-	cd $(BUILDDIR) && $(CMAKE) ..
+	cd $(BUILDDIR) && $(CMAKE) $(CMAKE_FLAGS) ..
 
 clean:
 	- $(RM) -r $(BUILDDIR)
