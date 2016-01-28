@@ -21,20 +21,25 @@ namespace {
 #else
 #define RUNTIME_ERROR(msg)            do { throw std::runtime_error(msg); } while (0)
 #define RUNTIME_ERROR_IF(cond, msg)   do { if (cond) RUNTIME_ERROR(msg); } while (0)
-#define REQUIRE_STACK_DEPTH(n, name)  RUNTIME_ERROR_IF(dStack.size() < (n), name ": stack underflow")
-#define REQUIRE_ALIGNED(addr, name)   RUNTIME_ERROR_IF((reinterpret_cast<Cell>(addr) % CellSize) != 0, name ": unaligned address")
-#define REQUIRE_VALID_HERE(name)      RUNTIME_ERROR_IF(!isHereValid(), name ": HERE is outside dictionary space")
+#define REQUIRE_STACK_DEPTH(n, name)  requireStackDepth(n, name)
+#define REQUIRE_ALIGNED(addr, name)   checkAligned(addr, name)
+#define REQUIRE_VALID_HERE(name)      checkValidHere(name)
 #endif
 
 using Cell = uintptr_t;
 using SCell = intptr_t;
 
-using CellStack = std::vector<Cell>;
-using Dictionary = std::vector<Cell>;
-
 using Addr = void*;
 using CAddr = char*;
 using AAddr = Cell*;
+
+#define CELL(x)  reinterpret_cast<Cell>(x)
+#define ADDR(x)  reinterpret_cast<Addr>(x)
+#define CADDR(x) reinterpret_cast<char*>(x)
+#define AADDR(x) reinterpret_cast<AAddr>(x)
+
+using CellStack = std::vector<Cell>;
+using Dictionary = std::vector<Cell>;
 
 constexpr auto CellSize = sizeof(Cell);
 
@@ -44,7 +49,32 @@ constexpr auto False = static_cast<Cell>(0);
 CellStack dStack;
 CellStack rStack;
 Dictionary dictionary(DICTIONARY_CELL_COUNT);
-auto dataPointer = reinterpret_cast<Addr>(&dictionary[0]);
+auto dataPointer = ADDR(&dictionary[0]);
+
+/*
+
+    Runtime checks
+
+*/
+
+// Used by REQUIRE_ALIGNED()
+template<typename T>
+void checkAligned(T addr, const char* name) {
+    RUNTIME_ERROR_IF((CELL(addr) % CellSize) != 0, std::string(name) + ": unaligned address");
+}
+
+// Used by REQUIRE_STACK_DEPTH()
+void requireStackDepth(int n, const char* name) {
+    RUNTIME_ERROR_IF(dStack.size() < size_t(n), std::string(name) + ": stack underflow");
+}
+
+// Used by REQUIRE_VALID_HERE()
+void checkValidHere(const char* name) {
+    auto lowLimit = &dictionary[0];
+    auto highLimit = &dictionary[dictionary.size()];
+    RUNTIME_ERROR_IF(dataPointer < lowLimit || highLimit <= dataPointer,
+                     std::string(name) + ": HERE outside dictionary space");
+}
 
 /*
  
@@ -52,27 +82,71 @@ auto dataPointer = reinterpret_cast<Addr>(&dictionary[0]);
 
 */
 
-// Used by REQUIRE_VALID_HERE()
-bool isHereValid() {
-    auto lowLimit = reinterpret_cast<char*>(&dictionary[0]);
-    auto highLimit = reinterpret_cast<char*>(&dictionary[dictionary.size()]);
-    return lowLimit <= dataPointer && dataPointer < highLimit;
+template<typename T>
+Addr alignAddress(T addr) {
+    auto offset = CELL(addr) % CellSize;
+    if (offset == 0) {
+        return ADDR(addr);
+    }
+    return CADDR(addr) + (CellSize - offset);
 }
 
 // ALIGN ( -- )
 void align() {
-    auto p = reinterpret_cast<Cell>(dataPointer);
-    auto offs = p % CellSize;
-    if (offs != 0) {
-        p = p + (CellSize - offs);
-        dataPointer = reinterpret_cast<Addr>(p);
-        REQUIRE_VALID_HERE("ALIGN");
-    }
+    dataPointer = alignAddress(dataPointer);
+    REQUIRE_VALID_HERE("ALIGN");
+}
+
+// ALIGNED ( addr -- a-addr )
+void aligned() {
+    REQUIRE_STACK_DEPTH(1, "ALIGNED");
+    dStack.back() = CELL(alignAddress(dStack.back()));
 }
 
 // HERE ( -- addr )
 void here() {
-    dStack.push_back(reinterpret_cast<Cell>(dataPointer));
+    dStack.push_back(CELL(dataPointer));
+}
+
+typedef void (*Code)(Addr codeFieldAddress);
+
+struct DictionaryEntry {
+    DictionaryEntry* nextEntry;
+    unsigned char    flags;
+    unsigned char    nameLength;
+    char             nameStart;
+
+    const char* name() {
+        return &nameStart;
+    }
+
+    Addr codeFieldAddress() {
+        return alignAddress(CADDR(&nameStart) + nameLength + 1);
+    }
+
+    void setCodeField(Code code) {
+        *AADDR(codeFieldAddress()) = CELL(code);
+    }
+
+    Code code() {
+        return reinterpret_cast<Code>(*AADDR(codeFieldAddress()));
+    }
+
+    Addr dataFieldAddress() {
+        return CADDR(codeFieldAddress()) + CellSize;
+    }
+};
+
+void doCreate(Addr codeFieldAddress) {
+    dStack.push_back(CELL(CADDR(codeFieldAddress) + CellSize));
+}
+
+void doConstant(Addr codeFieldAddress) {
+    // TODO
+}
+
+void doColon(Addr codeFieldAddress) {
+    // TODO
 }
 
 /*
@@ -84,7 +158,7 @@ void here() {
 // ! ( x a-addr -- )
 void store() {
     REQUIRE_STACK_DEPTH(2, "!");
-    auto aaddr = reinterpret_cast<AAddr>(dStack.back());
+    auto aaddr = AADDR(dStack.back());
     REQUIRE_ALIGNED(aaddr, "!");
     dStack.pop_back();
     auto x = dStack.back();
@@ -95,7 +169,7 @@ void store() {
 // @ ( a-addr -- x )
 void fetch() {
     REQUIRE_STACK_DEPTH(1, "@");
-    auto aaddr = reinterpret_cast<AAddr>(dStack.back());
+    auto aaddr = AADDR(dStack.back());
     REQUIRE_ALIGNED(aaddr, "@");
     dStack.back() = *aaddr;
 }
@@ -103,7 +177,7 @@ void fetch() {
 // c! ( char c-addr -- )
 void cstore() {
     REQUIRE_STACK_DEPTH(2, "C!");
-    auto caddr = reinterpret_cast<CAddr>(dStack.back());
+    auto caddr = CADDR(dStack.back());
     dStack.pop_back();
     auto x = dStack.back();
     dStack.pop_back();
@@ -113,7 +187,7 @@ void cstore() {
 // c@ ( c-addr -- char )
 void cfetch() {
     REQUIRE_STACK_DEPTH(1, "C@");
-    auto caddr = reinterpret_cast<CAddr>(dStack.back());
+    auto caddr = CADDR(dStack.back());
     REQUIRE_ALIGNED(caddr, "C@");
     dStack.back() = static_cast<Cell>(*caddr);
 }
@@ -221,7 +295,7 @@ void slash() {
 }
 
 // /MOD ( n1 n2 -- n3 n4 )
-void slashmod() {
+void slashMod() {
     REQUIRE_STACK_DEPTH(2, "/MOD");
     auto n2 = static_cast<SCell>(dStack.back());
     auto n1 = static_cast<SCell>(dStack[dStack.size() - 2]);
@@ -246,7 +320,7 @@ void equals() {
 }
 
 // < ( n1 n2 -- flag )
-void lessthan() {
+void lessThan() {
     REQUIRE_STACK_DEPTH(2, "<");
     auto n2 = static_cast<SCell>(dStack.back());
     dStack.pop_back();
@@ -254,7 +328,7 @@ void lessthan() {
 }
 
 // > ( n1 n2 -- flag )
-void greaterthan() {
+void greaterThan() {
     REQUIRE_STACK_DEPTH(2, ">");
     auto n2 = static_cast<SCell>(dStack.back());
     dStack.pop_back();
@@ -263,7 +337,8 @@ void greaterthan() {
 
 } // end anonymous namespace
 
-extern "C" void resetForth() { dStack.clear();
+extern "C" void resetForth() {
+    dStack.clear();
     rStack.clear();
     dictionary.clear();
 }
