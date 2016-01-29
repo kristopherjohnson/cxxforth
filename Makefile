@@ -1,3 +1,11 @@
+# Targets:
+# 
+# - default    builds 'targets' and 'tags'
+# - all        builds 'targets', 'optimized', and 'tags'
+# - targets    builds cxxforth executable
+# - optimized  builds cxxforth with runtime checks disabled
+# - clean      removes build products
+
 CMAKE ?= cmake
 MKDIR ?= mkdir
 RM ?= rm
@@ -5,17 +13,29 @@ CD ?= cd
 CTAGS ?= ctags
 
 BUILDDIR ?= build
+OPTIMIZEDDIR ?= build_optimized
+
+.PHONY: default
+default: targets tags
 
 .PHONY: all
-all: cmaketargets tags
+all: targets optimized tags
 
-.PHONY: cmaketargets
-cmaketargets: $(BUILDDIR)/Makefile
-	$(MAKE) -C $(BUILDDIR)
+.PHONY: targets
+targets: $(BUILDDIR)/Makefile
+	$(MAKE) -C $(BUILDDIR) 
 
-$(BUILDDIR)/Makefile: CMakeLists.txt
+$(BUILDDIR)/Makefile: CMakeLists.txt Makefile
 	$(MKDIR) -p $(BUILDDIR)
-	cd $(BUILDDIR) && $(CMAKE) $(CMAKE_FLAGS) ..
+	cd $(BUILDDIR) && $(CMAKE) ..
+
+.PHONY: optimized
+optimized: $(OPTIMIZEDDIR)/Makefile
+	$(MAKE) -C $(OPTIMIZEDDIR)
+
+$(OPTIMIZEDDIR)/Makefile: CMakeLists.txt Makefile
+	$(MKDIR) -p $(OPTIMIZEDDIR)
+	cd $(OPTIMIZEDDIR) && $(CMAKE) -DCONFIG_SKIP_RUNTIME_CHECKS=ON ..
 
 tags: forth.cpp forth.h cxxforth.c
 	$(CTAGS) $^
@@ -23,4 +43,5 @@ tags: forth.cpp forth.h cxxforth.c
 .PHONY: clean
 clean:
 	- $(RM) -r $(BUILDDIR)
+	- $(RM) -r $(OPTIMIZEDDIR)
 

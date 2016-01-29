@@ -1,5 +1,7 @@
 *~
 *.swp
+*.swo
 build
+build_optimized
 tags
 
