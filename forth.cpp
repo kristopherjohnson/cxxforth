@@ -47,10 +47,10 @@ constexpr auto False = static_cast<Cell>(0);
 
 CellStack dStack;
 CellStack rStack;
-Dictionary dictionary(DICT_CELL_COUNT);
+Dictionary dictionary;
 
-auto dataPointer = CADDR(&dictionary[0]);
-auto instructionPointer = CADDR(&dictionary[0]);
+CAddr dataPointer = nullptr;
+CAddr instructionPointer = nullptr;
 AAddr latestDefinition = nullptr;
 
 /*
@@ -480,6 +480,7 @@ AAddr findDefinition(CAddr nameToFind, Cell nameLength) {
 
 void initializeDictionary() {
     dictionary.clear();
+    dictionary.resize(DICT_CELL_COUNT);
     dataPointer = CADDR(&dictionary[0]);
     latestDefinition = nullptr;
 
@@ -519,7 +520,11 @@ void initializeDictionary() {
 
 extern "C" void resetForth() {
     dStack.clear();
+    dStack.reserve(64);
+
     rStack.clear();
+    rStack.reserve(64);
+
     initializeDictionary();
 }
 
