@@ -13,28 +13,17 @@ namespace {
 #define DICT_CELL_COUNT (16 * 1024)
 #endif
 
-#ifdef CONFIG_SKIP_RUNTIME_CHECKS
-#define RUNTIME_ERROR(msg)            do { } while (0)
-#define RUNTIME_ERROR_IF(cond, msg)   do { } while (0)
-#define REQUIRE_STACK_DEPTH(n, name)  do { } while (0)
-#define REQUIRE_ALIGNED(addr, name)   do { } while (0)
-#define REQUIRE_VALID_HERE(name)      do { } while (0)
-#else
-#define RUNTIME_ERROR(msg)            do { throw std::runtime_error(msg); } while (0)
-#define RUNTIME_ERROR_IF(cond, msg)   do { if (cond) RUNTIME_ERROR(msg); } while (0)
-#define REQUIRE_STACK_DEPTH(n, name)  requireStackDepth(n, name)
-#define REQUIRE_ALIGNED(addr, name)   checkAligned(addr, name)
-#define REQUIRE_VALID_HERE(name)      checkValidHere(name)
-#endif
-
 using Cell = uintptr_t;
 using SCell = intptr_t;
 
-using CAddr = char*;
+using UChar = unsigned char;
+using SChar = signed char;
+
+using CAddr = UChar*;
 using AAddr = Cell*;
 
 #define CELL(x)  reinterpret_cast<Cell>(x)
-#define CADDR(x) reinterpret_cast<char*>(x)
+#define CADDR(x) reinterpret_cast<UChar*>(x)
 #define AADDR(x) reinterpret_cast<AAddr>(x)
 
 using CellStack = std::vector<Cell>;
@@ -53,13 +42,30 @@ CAddr dataPointer = nullptr;
 CAddr instructionPointer = nullptr;
 AAddr latestDefinition = nullptr;
 
+size_t commandLineArgCount = 0;
+const char** commandLineArgVector = nullptr;
+
 /*
 
     Runtime checks
 
 */
 
-#ifndef CONFIG_SKIP_RUNTIME_CHECKS
+#ifdef CONFIG_SKIP_RUNTIME_CHECKS
+
+#define RUNTIME_ERROR(msg)            do { } while (0)
+#define RUNTIME_ERROR_IF(cond, msg)   do { } while (0)
+#define REQUIRE_STACK_DEPTH(n, name)  do { } while (0)
+#define REQUIRE_ALIGNED(addr, name)   do { } while (0)
+#define REQUIRE_VALID_HERE(name)      do { } while (0)
+
+#else
+
+#define RUNTIME_ERROR(msg)            do { throw std::runtime_error(msg); } while (0)
+#define RUNTIME_ERROR_IF(cond, msg)   do { if (cond) RUNTIME_ERROR(msg); } while (0)
+#define REQUIRE_STACK_DEPTH(n, name)  requireStackDepth(n, name)
+#define REQUIRE_ALIGNED(addr, name)   checkAligned(addr, name)
+#define REQUIRE_VALID_HERE(name)      checkValidHere(name)
 
 // Used by REQUIRE_ALIGNED()
 template<typename T>
@@ -189,6 +195,14 @@ void here() {
     push(CELL(dataPointer));
 }
 
+// ALLOT ( n -- )
+void allot() {
+    REQUIRE_STACK_DEPTH(1, "ALLOT");
+    dataPointer += topOfStack();
+    REQUIRE_VALID_HERE("ALLOT");
+    pop();
+}
+
 // CELL+ ( a-addr1 -- a-addr2 )
 void cellPlus() {
     REQUIRE_STACK_DEPTH(1, "CELL+");
@@ -225,7 +239,7 @@ void comma() {
 // Store a char to dictionary data space.
 void cdata(Cell x) {
     REQUIRE_VALID_HERE("C,");
-    *dataPointer = static_cast<char>(x);
+    *dataPointer = static_cast<UChar>(x);
     dataPointer += 1;
 }
 
@@ -268,7 +282,7 @@ void cstore() {
     pop();
     auto x = topOfStack();
     pop();
-    *caddr = static_cast<char>(x);
+    *caddr = static_cast<UChar>(x);
 }
 
 // c@ ( c-addr -- char )
@@ -352,11 +366,47 @@ void slashMod() {
     topOfStack() = static_cast<Cell>(result.quot);
 }
 
+// NEGATE ( n1 -- n2 )
+void negate() {
+    REQUIRE_STACK_DEPTH(1, "NEGATE");
+    topOfStack() = static_cast<Cell>(-static_cast<SCell>(topOfStack()));
+}
+
 /*
 
-    Logical primitives
+    Logical and relational primitives
 
 */
+
+// AND ( x1 x2 -- x3 )
+void bitwiseAnd() {
+    REQUIRE_STACK_DEPTH(2, "AND");
+    auto x2 = topOfStack();
+    pop();
+    topOfStack() = topOfStack() & x2;
+}
+
+// OR ( x1 x2 -- x3 )
+void bitwiseOr() {
+    REQUIRE_STACK_DEPTH(2, "OR");
+    auto x2 = topOfStack();
+    pop();
+    topOfStack() = topOfStack() | x2;
+}
+
+// XOR ( x1 x2 -- x3 )
+void bitwiseXor() {
+    REQUIRE_STACK_DEPTH(2, "XOR");
+    auto x2 = topOfStack();
+    pop();
+    topOfStack() = topOfStack() ^ x2;
+}
+
+// INVERT ( x1 -- x2 )
+void invert() {
+    REQUIRE_STACK_DEPTH(1, "INVERT");
+    topOfStack() = ~topOfStack();
+}
 
 // = ( x1 x2 -- flag )
 void equals() {
@@ -384,6 +434,30 @@ void greaterThan() {
 
 /*
 
+    Environmental primitives
+
+*/
+
+// #ARG ( -- n )
+// Provide count of command-line arguments.
+// Not an ANS Forth word.
+void argCount() {
+    push(commandLineArgCount);
+}
+
+// ARG ( n -- c-addr u )
+// Provide the Nth command-line argument.
+// Not an ANS Forth word.`
+void argAtIndex() {
+    auto index = static_cast<size_t>(topOfStack());
+    RUNTIME_ERROR_IF(index >= commandLineArgCount, "ARG: invalid index");
+    auto value = commandLineArgVector[index];
+    topOfStack() = CELL(value);
+    push(strlen(value));
+}
+
+/*
+
     Dictionary
 
 */
@@ -394,12 +468,12 @@ constexpr size_t MaxNameLength = 31;
 
 struct DictionaryEntry {
     DictionaryEntry* link;
-    uint8_t          flags;
-    uint8_t          nameLength;
-    char             nameStart;
+    UChar            flags;
+    UChar            nameLength;
+    UChar            nameStart;
 
     AAddr codeFieldAddress() const {
-        return alignAddress(CADDR(const_cast<char*>(&nameStart)) + nameLength + 1);
+        return alignAddress(CADDR(const_cast<UChar*>(&nameStart)) + nameLength + 1);
     }
 
     void setCodeField(Code code) {
@@ -429,8 +503,8 @@ void doColon() {
 
 void defineCode(const char* name, Code code) {
     auto nameLength = strlen(name);
-    RUNTIME_ERROR_IF(nameLength == 0, "code name empty");
-    RUNTIME_ERROR_IF(nameLength > MaxNameLength, "code name too long");
+    RUNTIME_ERROR_IF(nameLength == 0, "name empty");
+    RUNTIME_ERROR_IF(nameLength > MaxNameLength, "name too long");
 
     align();
     auto start = AADDR(dataPointer);
@@ -495,6 +569,7 @@ void initializeDictionary() {
     defineCode("ALIGN",   align);
     defineCode("ALIGNED", aligned);
     defineCode("HERE",    here);
+    defineCode("ALLOT",   allot);
     defineCode("CELL+",   cellPlus);
     defineCode("CELLS",   cells);
     defineCode("CHAR+",   charPlus);
@@ -511,9 +586,16 @@ void initializeDictionary() {
     defineCode("*",       star);
     defineCode("/",       slash);
     defineCode("/MOD",    slashMod);
+    defineCode("NEGATE",  negate);
+    defineCode("AND",     bitwiseAnd);
+    defineCode("OR",      bitwiseOr);
+    defineCode("XOR",     bitwiseXor);
+    defineCode("INVERT",  invert);
     defineCode("=",       equals);
     defineCode("<",       lessThan);
     defineCode(">",       greaterThan);
+    defineCode("#ARG",    argCount);
+    defineCode("ARG",     argAtIndex);
 }
 
 } // end anonymous namespace
@@ -530,6 +612,8 @@ extern "C" void resetForth() {
 
 extern "C" int runForth(int argc, const char** argv) {
     try {
+        commandLineArgCount = static_cast<size_t>(argc);
+        commandLineArgVector = argv;
         resetForth();
         return 0;
     }
