@@ -1,46 +1,58 @@
-#include "forth.h"
+#include "cxxforth.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <vector>
 
 
 namespace {
 
-#ifndef DICT_CELL_COUNT
-#define DICT_CELL_COUNT (16 * 1024)
+#ifndef CXXFORTH_DATA_SIZE
+#define CXXFORTH_DATA_SIZE (64 * 1024)
 #endif
 
 using Cell = uintptr_t;
 using SCell = intptr_t;
 
-using UChar = unsigned char;
+using Char = unsigned char;
 using SChar = signed char;
 
-using CAddr = UChar*;
+using CAddr = Char*;
 using AAddr = Cell*;
 
 #define CELL(x)  reinterpret_cast<Cell>(x)
-#define CADDR(x) reinterpret_cast<UChar*>(x)
+#define CADDR(x) reinterpret_cast<Char*>(x)
 #define AADDR(x) reinterpret_cast<AAddr>(x)
 
 using CellStack = std::vector<Cell>;
-using Dictionary = std::vector<Cell>;
 
 constexpr auto CellSize = sizeof(Cell);
 
 constexpr auto True = static_cast<Cell>(-1);
 constexpr auto False = static_cast<Cell>(0);
 
-CellStack dStack;
-CellStack rStack;
+using Code = void(*)();
+
+struct Word {
+    Code        code = nullptr;
+    AAddr       parameters = nullptr;
+    std::string name;
+    Char        flags = 0;
+};
+
+using Dictionary = std::vector<Word>;
+using DataSpace = std::vector<Char>;
+
+CellStack  dStack;
+CellStack  rStack;
+DataSpace  dataSpace;
 Dictionary dictionary;
 
 CAddr dataPointer = nullptr;
 CAddr instructionPointer = nullptr;
-AAddr latestDefinition = nullptr;
 
 size_t commandLineArgCount = 0;
 const char** commandLineArgVector = nullptr;
@@ -51,7 +63,7 @@ const char** commandLineArgVector = nullptr;
 
 */
 
-#ifdef CONFIG_SKIP_RUNTIME_CHECKS
+#ifdef CXXFORTH_SKIP_RUNTIME_CHECKS
 
 #define RUNTIME_ERROR(msg)            do { } while (0)
 #define RUNTIME_ERROR_IF(cond, msg)   do { } while (0)
@@ -67,26 +79,23 @@ const char** commandLineArgVector = nullptr;
 #define REQUIRE_ALIGNED(addr, name)   checkAligned(addr, name)
 #define REQUIRE_VALID_HERE(name)      checkValidHere(name)
 
-// Used by REQUIRE_ALIGNED()
 template<typename T>
 void checkAligned(T addr, const char* name) {
     RUNTIME_ERROR_IF((CELL(addr) % CellSize) != 0, std::string(name) + ": unaligned address");
 }
 
-// Used by REQUIRE_STACK_DEPTH()
 void requireStackDepth(int n, const char* name) {
     RUNTIME_ERROR_IF(dStack.size() < size_t(n), std::string(name) + ": stack underflow");
 }
 
-// Used by REQUIRE_VALID_HERE()
 void checkValidHere(const char* name) {
-    auto lowLimit = CADDR(&dictionary[0]);
-    auto highLimit = CADDR(&dictionary[dictionary.size()]);
+    auto lowLimit = &dataSpace[0];
+    auto highLimit = &dataSpace[dataSpace.size()];
     RUNTIME_ERROR_IF(dataPointer < lowLimit || highLimit <= dataPointer,
-                     std::string(name) + ": HERE outside dictionary space");
+                     std::string(name) + ": HERE outside data space");
 }
 
-#endif // CONFIG_SKIP_RUNTIME_CHECKS
+#endif // CXXFORTH_SKIP_RUNTIME_CHECKS
 
 /*
 
@@ -221,7 +230,7 @@ void charPlus() {
     ++topOfStack();
 }
 
-// Store a cell to dictionary data space.
+// Store a cell to data space.
 void data(Cell x) {
     REQUIRE_VALID_HERE(",");
     REQUIRE_ALIGNED(dataPointer, ",");
@@ -236,10 +245,10 @@ void comma() {
     pop();
 }
 
-// Store a char to dictionary data space.
+// Store a char to data space.
 void cdata(Cell x) {
     REQUIRE_VALID_HERE("C,");
-    *dataPointer = static_cast<UChar>(x);
+    *dataPointer = static_cast<Char>(x);
     dataPointer += 1;
 }
 
@@ -282,7 +291,7 @@ void cstore() {
     pop();
     auto x = topOfStack();
     pop();
-    *caddr = static_cast<UChar>(x);
+    *caddr = static_cast<Char>(x);
 }
 
 // c@ ( c-addr -- char )
@@ -462,33 +471,6 @@ void argAtIndex() {
 
 */
 
-using Code = void(*)();
-
-constexpr size_t MaxNameLength = 31;
-
-struct DictionaryEntry {
-    DictionaryEntry* link;
-    UChar            flags;
-    UChar            nameLength;
-    UChar            nameStart;
-
-    AAddr codeFieldAddress() const {
-        return alignAddress(CADDR(const_cast<UChar*>(&nameStart)) + nameLength + 1);
-    }
-
-    void setCodeField(Code code) {
-        *(codeFieldAddress()) = CELL(code);
-    }
-
-    Code code() const {
-        return reinterpret_cast<Code>(*(codeFieldAddress()));
-    }
-
-    AAddr dataFieldAddress() const {
-        return AADDR(CADDR(codeFieldAddress()) + CellSize);
-    }
-};
-
 void doCreate() {
     // TODO
 }
@@ -502,28 +484,16 @@ void doColon() {
 }
 
 void defineCode(const char* name, Code code) {
-    auto nameLength = strlen(name);
-    RUNTIME_ERROR_IF(nameLength == 0, "name empty");
-    RUNTIME_ERROR_IF(nameLength > MaxNameLength, "name too long");
+    Word word;
+    word.code = code;
+    word.name = name;
 
     align();
-    auto start = AADDR(dataPointer);
+    word.parameters = AADDR(dataPointer);
 
-    data(CELL(latestDefinition)); // link
-    cdata(0);                     // flags
-    cdata(nameLength);            // nameLength
-
-    for (decltype(nameLength) i = 0; i < nameLength; ++i) {
-        cdata(static_cast<unsigned char>(std::toupper(name[i])));
-    }
-
-    align();
-    data(Cell(code));            // code field
-
-    latestDefinition = start;
+    dictionary.emplace_back(std::move(word));
 }
 
-// Determine whether two names with the same length match.
 bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
     for (size_t i = 0; i < nameLength; ++i) {
         if (std::toupper(name1[i]) != std::toupper(name2[i])) {
@@ -533,69 +503,69 @@ bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
     return true;
 }
 
-AAddr findDefinition(CAddr nameToFind, Cell nameLength) {
-    if (nameLength == 0) {
-        return nullptr;
-    }
-
-    auto p = latestDefinition;
-    while (p) {
-        auto entry = reinterpret_cast<DictionaryEntry*>(p);
-        if (static_cast<Cell>(entry->nameLength) == nameLength) {
-            auto entryName = &entry->nameStart;
-            if (doNamesMatch(nameToFind, entryName, nameLength)) {
-                return p;
+Word* findWord(CAddr nameToFind, Cell nameLength) {
+    for (auto i = dictionary.rbegin(); i != dictionary.rend(); ++i) {
+        auto& word = *i;
+        auto& wordName = word.name;
+        if (wordName.length() == nameLength) {
+            auto wordNameCAddr = CADDR(const_cast<char*>(wordName.c_str()));
+            if (doNamesMatch(nameToFind, wordNameCAddr, nameLength)) {
+                return &word;
             }
         }
-        p = AADDR(*p);
     }
     return nullptr;
 }
 
+void words() {
+    for (auto i = dictionary.rbegin(); i != dictionary.rend(); ++i) {
+        std::cout << i->name << " ";
+    }
+}
+
 void initializeDictionary() {
     dictionary.clear();
-    dictionary.resize(DICT_CELL_COUNT);
-    dataPointer = CADDR(&dictionary[0]);
-    latestDefinition = nullptr;
+    dictionary.reserve(128);
 
-    defineCode("DROP",    drop);
-    defineCode("DUP",     dup);
-    defineCode("OVER",    over);
-    defineCode("SWAP",    swap);
-    defineCode("?DUP",    qdup);
+    defineCode("!",       store);
+    defineCode("#ARG",    argCount);
+    defineCode("*",       star);
+    defineCode("+",       plus);
+    defineCode(",",       comma);
+    defineCode("-",       minus);
+    defineCode("/",       slash);
+    defineCode("/MOD",    slashMod);
+    defineCode("<",       lessThan);
+    defineCode("=",       equals);
+    defineCode(">",       greaterThan);
     defineCode(">R",      toR);
-    defineCode("R>",      rFrom);
-    defineCode("R@",      rFetch);
+    defineCode("?DUP",    qdup);
+    defineCode("@",       fetch);
     defineCode("ALIGN",   align);
     defineCode("ALIGNED", aligned);
-    defineCode("HERE",    here);
     defineCode("ALLOT",   allot);
+    defineCode("AND",     bitwiseAnd);
+    defineCode("ARG",     argAtIndex);
+    defineCode("C!",      cstore);
+    defineCode("C,",      ccomma);
+    defineCode("C@",      cfetch);
     defineCode("CELL+",   cellPlus);
     defineCode("CELLS",   cells);
     defineCode("CHAR+",   charPlus);
-    defineCode(",",       comma);
-    defineCode("C,",      ccomma);
-    defineCode("!",       store);
-    defineCode("@",       fetch);
-    defineCode("C!",      cstore);
-    defineCode("C@",      cfetch);
+    defineCode("DROP",    drop);
+    defineCode("DUP",     dup);
     defineCode("EMIT",    emit);
-    defineCode("KEY",     key);
-    defineCode("+",       plus);
-    defineCode("-",       minus);
-    defineCode("*",       star);
-    defineCode("/",       slash);
-    defineCode("/MOD",    slashMod);
-    defineCode("NEGATE",  negate);
-    defineCode("AND",     bitwiseAnd);
-    defineCode("OR",      bitwiseOr);
-    defineCode("XOR",     bitwiseXor);
+    defineCode("HERE",    here);
     defineCode("INVERT",  invert);
-    defineCode("=",       equals);
-    defineCode("<",       lessThan);
-    defineCode(">",       greaterThan);
-    defineCode("#ARG",    argCount);
-    defineCode("ARG",     argAtIndex);
+    defineCode("KEY",     key);
+    defineCode("NEGATE",  negate);
+    defineCode("OR",      bitwiseOr);
+    defineCode("OVER",    over);
+    defineCode("R>",      rFrom);
+    defineCode("R@",      rFetch);
+    defineCode("SWAP",    swap);
+    defineCode("WORDS",   words);
+    defineCode("XOR",     bitwiseXor);
 }
 
 } // end anonymous namespace
@@ -606,6 +576,10 @@ extern "C" void resetForth() {
 
     rStack.clear();
     rStack.reserve(64);
+
+    dataSpace.clear();
+    dataSpace.resize(CXXFORTH_DATA_SIZE);
+    dataPointer = &dataSpace[0];
 
     initializeDictionary();
 }
@@ -622,4 +596,11 @@ extern "C" int runForth(int argc, const char** argv) {
         return -1;
     }
 }
+
+#ifndef CXXFORTH_NO_MAIN
+int main(int argc, const char** argv) {
+    return runForth(argc, argv);
+}
+#endif
+
 

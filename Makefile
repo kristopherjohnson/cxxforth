@@ -35,9 +35,9 @@ optimized: $(OPTIMIZEDDIR)/Makefile
 
 $(OPTIMIZEDDIR)/Makefile: CMakeLists.txt Makefile
 	$(MKDIR) -p $(OPTIMIZEDDIR)
-	cd $(OPTIMIZEDDIR) && $(CMAKE) -DCONFIG_SKIP_RUNTIME_CHECKS=ON ..
+	cd $(OPTIMIZEDDIR) && $(CMAKE) -DCXXFORTH_SKIP_RUNTIME_CHECKS=ON ..
 
-tags: forth.cpp forth.h cxxforth.c
+tags: cxxforth.cpp cxxforth.h
 	$(CTAGS) $^
 
 .PHONY: clean

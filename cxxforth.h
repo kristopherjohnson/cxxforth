@@ -1,7 +1,7 @@
-#ifndef forth_hpp_included
-#define forth_hpp_included
+#ifndef cxxforth_hpp_included
+#define cxxforth_hpp_included
 
-#include "forthconfig.h"
+#include "cxxforthconfig.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,5 +14,5 @@ int runForth(int argc, const char** argv);
 }
 #endif
 
-#endif // forth_hpp_included
+#endif // cxxforth_hpp_included
 

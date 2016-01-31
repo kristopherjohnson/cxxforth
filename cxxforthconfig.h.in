@@ -1,0 +1,14 @@
+// cxxforthconfig.h.in is processed by cmake to produce cxxforthconfig.h
+// 
+// If you are not using CMake, you can just create an empty
+// file named "cxxforthconfig.h", and everything will build properly.
+
+#ifndef cxxforthconfig_h_included
+#define cxxforthconfig_h_included
+
+#cmakedefine CXXFORTH_DATA_SIZE (@CXXFORTH_DATA_SIZE@)
+#cmakedefine CXXFORTH_SKIP_RUNTIME_CHECKS
+#cmakedefine CXXFORTH_DISABLE_MAIN
+
+#endif // cxxforthconfig_h_included
+
