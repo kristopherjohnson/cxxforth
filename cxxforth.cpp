@@ -566,49 +566,54 @@ void initializeDictionary() {
     dictionary.clear();
     dictionary.reserve(128);
 
-    defineCode("!",       store);
-    defineCode("#ARG",    argCount);
-    defineCode("*",       star);
-    defineCode("+",       plus);
-    defineCode(",",       comma);
-    defineCode("-",       minus);
-    defineCode("/",       slash);
-    defineCode("/MOD",    slashMod);
-    defineCode("<",       lessThan);
-    defineCode("=",       equals);
-    defineCode(">",       greaterThan);
-    defineCode(">R",      toR);
-    defineCode("?DUP",    qdup);
-    defineCode("@",       fetch);
-    defineCode("ALIGN",   align);
-    defineCode("ALIGNED", aligned);
-    defineCode("ALLOT",   allot);
-    defineCode("AND",     bitwiseAnd);
-    defineCode("ARG",     argAtIndex);
-    defineCode("BYE",     bye);
-    defineCode("C!",      cstore);
-    defineCode("C,",      ccomma);
-    defineCode("C@",      cfetch);
-    defineCode("CELL+",   cellPlus);
-    defineCode("CELLS",   cells);
-    defineCode("CHAR+",   charPlus);
-    defineCode("DROP",    drop);
-    defineCode("DUP",     dup);
-    defineCode("EMIT",    emit);
-    defineCode("HERE",    here);
-    defineCode("INVERT",  invert);
-    defineCode("KEY",     key);
-    defineCode("LSHIFT",  lshift);
-    defineCode("NEGATE",  negate);
-    defineCode("OR",      bitwiseOr);
-    defineCode("OVER",    over);
-    defineCode("R>",      rFrom);
-    defineCode("R@",      rFetch);
-    defineCode("ROT",     rot);
-    defineCode("RSHIFT",  rshift);
-    defineCode("SWAP",    swap);
-    defineCode("WORDS",   words);
-    defineCode("XOR",     bitwiseXor);
+    static struct { const char* name; Code code; } primitives[] = {
+        {"!",       store},
+        {"#ARG",    argCount},
+        {"*",       star},
+        {"+",       plus},
+        {",",       comma},
+        {"-",       minus},
+        {"/",       slash},
+        {"/MOD",    slashMod},
+        {"<",       lessThan},
+        {"=",       equals},
+        {">",       greaterThan},
+        {">R",      toR},
+        {"?DUP",    qdup},
+        {"@",       fetch},
+        {"ALIGN",   align},
+        {"ALIGNED", aligned},
+        {"ALLOT",   allot},
+        {"AND",     bitwiseAnd},
+        {"ARG",     argAtIndex},
+        {"BYE",     bye},
+        {"C!",      cstore},
+        {"C,",      ccomma},
+        {"C@",      cfetch},
+        {"CELL+",   cellPlus},
+        {"CELLS",   cells},
+        {"CHAR+",   charPlus},
+        {"DROP",    drop},
+        {"DUP",     dup},
+        {"EMIT",    emit},
+        {"HERE",    here},
+        {"INVERT",  invert},
+        {"KEY",     key},
+        {"LSHIFT",  lshift},
+        {"NEGATE",  negate},
+        {"OR",      bitwiseOr},
+        {"OVER",    over},
+        {"R>",      rFrom},
+        {"R@",      rFetch},
+        {"ROT",     rot},
+        {"RSHIFT",  rshift},
+        {"SWAP",    swap},
+        {"WORDS",   words},
+        {"XOR",     bitwiseXor}
+    };
+    for (auto& p: primitives) {
+        defineCode(p.name, p.code);
+    }
 }
 
 } // end anonymous namespace
