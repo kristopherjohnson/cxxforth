@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -490,7 +492,7 @@ void argAtIndex() {
     RUNTIME_ERROR_IF(index >= commandLineArgCount, "ARG: invalid index");
     auto value = commandLineArgVector[index];
     topOfStack() = CELL(value);
-    push(strlen(value));
+    push(std::strlen(value));
 }
 
 /*
