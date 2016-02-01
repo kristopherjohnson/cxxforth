@@ -1,5 +1,5 @@
-cmake_minimum_required (VERSION 3.0)
-project (cxxforth)
+cmake_minimum_required(VERSION 3.0)
+project(cxxforth)
 add_executable(cxxforth cxxforth.cpp)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")

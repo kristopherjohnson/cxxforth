@@ -86,8 +86,8 @@ void checkAligned(T addr, const char* name) {
     RUNTIME_ERROR_IF((CELL(addr) % CellSize) != 0, std::string(name) + ": unaligned address");
 }
 
-void requireStackDepth(int n, const char* name) {
-    RUNTIME_ERROR_IF(dStack.size() < size_t(n), std::string(name) + ": stack underflow");
+void requireStackDepth(size_t n, const char* name) {
+    RUNTIME_ERROR_IF(dStack.size() < n, std::string(name) + ": stack underflow");
 }
 
 void checkValidHere(const char* name) {
@@ -155,6 +155,27 @@ void rot() {
     dStack[size - 2] = x3;
     dStack[size - 3] = x2;
     dStack[size - 1] = x1;
+}
+
+// PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
+void pick() {
+    REQUIRE_STACK_DEPTH(1, "PICK");
+    auto n = topOfStack();
+    REQUIRE_STACK_DEPTH(n + 2, "PICK");
+    topOfStack() = dStack[dStack.size() - 2 - n];
+}
+
+// ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
+void roll() {
+    REQUIRE_STACK_DEPTH(1, "ROLL");
+    auto n = topOfStack();
+    pop();
+    if (n > 0) {
+        auto size = dStack.size();
+        auto x = dStack[size - 1 - n];
+        std::memmove(&dStack[size - 1 - n], &dStack[size - n], n * sizeof(Cell));
+        topOfStack() = x;
+    }
 }
 
 // ?DUP ( x -- 0 | x x )
@@ -605,8 +626,10 @@ void initializeDictionary() {
         {"NEGATE",  negate},
         {"OR",      bitwiseOr},
         {"OVER",    over},
+        {"PICK",    pick},
         {"R>",      rFrom},
         {"R@",      rFetch},
+        {"ROLL",    roll},
         {"ROT",     rot},
         {"RSHIFT",  rshift},
         {"SWAP",    swap},
