@@ -160,20 +160,21 @@ void rot() {
 // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
 void pick() {
     REQUIRE_STACK_DEPTH(1, "PICK");
-    auto n = topOfStack();
-    REQUIRE_STACK_DEPTH(n + 2, "PICK");
-    topOfStack() = dStack[dStack.size() - 2 - n];
+    auto index = topOfStack();
+    REQUIRE_STACK_DEPTH(index + 2, "PICK");
+    topOfStack() = dStack[dStack.size() - 2 - index];
 }
 
 // ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
 void roll() {
     REQUIRE_STACK_DEPTH(1, "ROLL");
-    auto n = topOfStack();
+    auto index = topOfStack();
     pop();
-    if (n > 0) {
+    if (index > 0) {
+        REQUIRE_STACK_DEPTH(index + 1, "ROLL");
         auto size = dStack.size();
-        auto x = dStack[size - 1 - n];
-        std::memmove(&dStack[size - 1 - n], &dStack[size - n], n * sizeof(Cell));
+        auto x = dStack[size - 1 - index];
+        std::memmove(&dStack[size - 1 - index], &dStack[size - index], index * sizeof(Cell));
         topOfStack() = x;
     }
 }
