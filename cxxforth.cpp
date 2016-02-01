@@ -143,6 +143,18 @@ void swap() {
     std::swap(dStack[size - 1], dStack[size - 2]);
 }
 
+// ROT ( x1 x2 x3 -- x2 x3 x1 )
+void rot() {
+    REQUIRE_STACK_DEPTH(3, "ROT");
+    auto size = dStack.size();
+    auto x1 = dStack[size - 3];
+    auto x2 = dStack[size - 2];
+    auto x3 = dStack[size - 1];
+    dStack[size - 2] = x3;
+    dStack[size - 3] = x2;
+    dStack[size - 1] = x1;
+}
+
 // ?DUP ( x -- 0 | x x )
 void qdup() {
     REQUIRE_STACK_DEPTH(1, "?DUP");
@@ -417,6 +429,22 @@ void invert() {
     topOfStack() = ~topOfStack();
 }
 
+// LSHIFT ( x1 u -- x2 )
+void lshift() {
+    REQUIRE_STACK_DEPTH(2, "LSHIFT");
+    auto n = topOfStack();
+    pop();
+    topOfStack() <<= n;
+}
+
+// RSHIFT ( x1 u -- x2 )
+void rshift() {
+    REQUIRE_STACK_DEPTH(2, "RSHIFT");
+    auto n = topOfStack();
+    pop();
+    topOfStack() >>= n;
+}
+
 // = ( x1 x2 -- flag )
 void equals() {
     REQUIRE_STACK_DEPTH(2, "=");
@@ -463,6 +491,17 @@ void argAtIndex() {
     auto value = commandLineArgVector[index];
     topOfStack() = CELL(value);
     push(strlen(value));
+}
+
+/*
+
+    Other system words
+
+*/
+
+// BYE ( -- )
+void bye() {
+    std::exit(EXIT_SUCCESS);
 }
 
 /*
@@ -546,6 +585,7 @@ void initializeDictionary() {
     defineCode("ALLOT",   allot);
     defineCode("AND",     bitwiseAnd);
     defineCode("ARG",     argAtIndex);
+    defineCode("BYE",     bye);
     defineCode("C!",      cstore);
     defineCode("C,",      ccomma);
     defineCode("C@",      cfetch);
@@ -558,11 +598,14 @@ void initializeDictionary() {
     defineCode("HERE",    here);
     defineCode("INVERT",  invert);
     defineCode("KEY",     key);
+    defineCode("LSHIFT",  lshift);
     defineCode("NEGATE",  negate);
     defineCode("OR",      bitwiseOr);
     defineCode("OVER",    over);
     defineCode("R>",      rFrom);
     defineCode("R@",      rFetch);
+    defineCode("ROT",     rot);
+    defineCode("RSHIFT",  rshift);
     defineCode("SWAP",    swap);
     defineCode("WORDS",   words);
     defineCode("XOR",     bitwiseXor);
