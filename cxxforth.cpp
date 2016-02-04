@@ -39,13 +39,38 @@ constexpr auto False = static_cast<Cell>(0);
 using Code = void(*)();
 
 struct Word {
-    Code        code = nullptr;
-    AAddr       parameters = nullptr;
+    Code        code      = nullptr;
+    AAddr       parameter = nullptr;
+    AAddr       extra     = nullptr;
+    Cell        flags     = 0;   
     std::string name;
-    Char        flags = 0;
+
+    enum {
+        FlagImmediate = 1,
+        FlagHidden = 2
+    };
+
+    const char* nameAddress() const {
+        return name.c_str();
+    }
+
+    std::size_t nameLength() const {
+        return name.length();
+    }
+
+    bool isHidden() const {
+        return (flags & FlagImmediate) != 0;
+    }
+
+    bool isImmediate() const {
+        return (flags & FlagHidden) != 0;
+    }
 };
 
+using Xt = Word*;
+
 using Dictionary = std::vector<Word>;
+
 using DataSpace = std::vector<Char>;
 
 CellStack  dStack;
@@ -54,7 +79,9 @@ DataSpace  dataSpace;
 Dictionary dictionary;
 
 CAddr dataPointer = nullptr;
-CAddr instructionPointer = nullptr;
+
+Word* currentWord = nullptr;
+Word* nextWord = nullptr;
 
 size_t commandLineArgCount = 0;
 const char** commandLineArgVector = nullptr;
@@ -120,22 +147,67 @@ Cell& topOfStack() {
     return dStack.back();
 }
 
+// Push cell onto return stack.
+void rpush(Cell x) {
+    rStack.push_back(x);
+}
+
+// Pop cell from return stack.
+void rpop() {
+    rStack.pop_back();
+}
+
+// Get reference to the top-of-stack cell on the return stack.
+Cell& topOfReturnStack() {
+    return rStack.back();
+}
+
+/*
+
+    Interpreter
+
+*/
+
+void startColon() {
+    rpush(CELL(nextWord));
+    nextWord = reinterpret_cast<Word*>(currentWord->parameter);
+}
+
+void endColon() {
+    nextWord = reinterpret_cast<Word*>(topOfReturnStack());
+    rpop();
+}
+
+void next() {
+    currentWord = nextWord;
+    ++nextWord;
+}
+
+/*
+
+    Stack manipulation words
+
+*/
+
 // DROP ( x -- )
 void drop() {
     REQUIRE_STACK_DEPTH(1, "DROP");
     pop();
+    next();
 }
 
 // DUP ( x -- x x )
 void dup() {
     REQUIRE_STACK_DEPTH(1, "DUP");
     push(topOfStack());
+    next();
 }
 
 // OVER ( x1 x2 -- x1 x2 x1 )
 void over() {
     REQUIRE_STACK_DEPTH(2, "OVER");
     push(dStack[dStack.size() - 2]);
+    next();
 }
 
 // SWAP ( x1 x2 -- x2 x1 )
@@ -143,6 +215,7 @@ void swap() {
     REQUIRE_STACK_DEPTH(2, "SWAP");
     auto size = dStack.size();
     std::swap(dStack[size - 1], dStack[size - 2]);
+    next();
 }
 
 // ROT ( x1 x2 x3 -- x2 x3 x1 )
@@ -155,6 +228,7 @@ void rot() {
     dStack[size - 2] = x3;
     dStack[size - 3] = x2;
     dStack[size - 1] = x1;
+    next();
 }
 
 // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
@@ -163,6 +237,7 @@ void pick() {
     auto index = topOfStack();
     REQUIRE_STACK_DEPTH(index + 2, "PICK");
     topOfStack() = dStack[dStack.size() - 2 - index];
+    next();
 }
 
 // ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
@@ -177,6 +252,7 @@ void roll() {
         std::memmove(&dStack[size - 1 - index], &dStack[size - index], index * sizeof(Cell));
         topOfStack() = x;
     }
+    next();
 }
 
 // ?DUP ( x -- 0 | x x )
@@ -186,6 +262,7 @@ void qdup() {
     if (top != 0) {
         push(top);
     }
+    next();
 }
 
 // >R ( x -- ) ( R:  -- x )
@@ -193,6 +270,7 @@ void toR() {
     REQUIRE_STACK_DEPTH(1, ">R");
     rStack.push_back(topOfStack());
     pop();
+    next();
 }
 
 // R> ( -- x ) ( R: x -- )
@@ -200,12 +278,14 @@ void rFrom() {
     RUNTIME_ERROR_IF(rStack.size() < 1, "R>: return stack underflow");
     push(rStack.back());
     rStack.pop_back();
+    next();
 }
 
 // R@ ( -- x ) ( R: x -- x )
 void rFetch() {
     RUNTIME_ERROR_IF(rStack.size() < 1, "R@: return stack underflow");
     push(rStack.back());
+    next();
 }
 
 /*
@@ -223,21 +303,28 @@ AAddr alignAddress(T addr) {
     return AADDR(CADDR(addr) + (CellSize - offset));
 }
 
-// ALIGN ( -- )
-void align() {
+void alignDataPointer() {
     dataPointer = CADDR(alignAddress(dataPointer));
     REQUIRE_VALID_HERE("ALIGN");
+}
+
+// ALIGN ( -- )
+void align() {
+    alignDataPointer();
+    next();
 }
 
 // ALIGNED ( addr -- a-addr )
 void aligned() {
     REQUIRE_STACK_DEPTH(1, "ALIGNED");
     topOfStack() = CELL(alignAddress(topOfStack()));
+    next();
 }
 
 // HERE ( -- addr )
 void here() {
     push(CELL(dataPointer));
+    next();
 }
 
 // ALLOT ( n -- )
@@ -246,24 +333,28 @@ void allot() {
     dataPointer += topOfStack();
     REQUIRE_VALID_HERE("ALLOT");
     pop();
+    next();
 }
 
 // CELL+ ( a-addr1 -- a-addr2 )
 void cellPlus() {
     REQUIRE_STACK_DEPTH(1, "CELL+");
     topOfStack() += CellSize;
+    next();
 }
 
 // CELLS ( n1 -- n2 )
 void cells() {
     REQUIRE_STACK_DEPTH(1, "CELLS");
     topOfStack() *= CellSize;
+    next();
 }
 
 // CHAR+ ( c-addr1 -- c-addr2 )
 void charPlus() {
     REQUIRE_STACK_DEPTH(1, "CHAR+");
     ++topOfStack();
+    next();
 }
 
 // Store a cell to data space.
@@ -279,6 +370,7 @@ void comma() {
     REQUIRE_STACK_DEPTH(1, ",");
     data(topOfStack());
     pop();
+    next();
 }
 
 // Store a char to data space.
@@ -286,6 +378,7 @@ void cdata(Cell x) {
     REQUIRE_VALID_HERE("C,");
     *dataPointer = static_cast<Char>(x);
     dataPointer += 1;
+    next();
 }
 
 // C, ( char -- )
@@ -293,6 +386,7 @@ void ccomma() {
     REQUIRE_STACK_DEPTH(1, "C,");
     cdata(topOfStack());
     pop();
+    next();
 }
 
 /*
@@ -310,6 +404,7 @@ void store() {
     auto x = topOfStack();
     pop();
     *aaddr = x;
+    next();
 }
 
 // @ ( a-addr -- x )
@@ -318,6 +413,7 @@ void fetch() {
     auto aaddr = AADDR(topOfStack());
     REQUIRE_ALIGNED(aaddr, "@");
     topOfStack() = *aaddr;
+    next();
 }
 
 // c! ( char c-addr -- )
@@ -328,6 +424,7 @@ void cstore() {
     auto x = topOfStack();
     pop();
     *caddr = static_cast<Char>(x);
+    next();
 }
 
 // c@ ( c-addr -- char )
@@ -336,6 +433,7 @@ void cfetch() {
     auto caddr = CADDR(topOfStack());
     REQUIRE_ALIGNED(caddr, "C@");
     topOfStack() = static_cast<Cell>(*caddr);
+    next();
 }
 
 /*
@@ -350,11 +448,13 @@ void emit() {
     auto cell = topOfStack();
     pop();
     std::cout.put(static_cast<char>(cell));
+    next();
 }
 
 // KEY ( -- x )
 void key() {
     push(static_cast<Cell>(std::cin.get()));
+    next();
 }
 
 /*
@@ -370,6 +470,7 @@ void plus() {
     pop();
     auto n1 = static_cast<SCell>(topOfStack());
     topOfStack() = static_cast<Cell>(n1 + n2);
+    next();
 }
 
 // - ( n1 n2 -- n3 )
@@ -379,6 +480,7 @@ void minus() {
     pop();
     auto n1 = static_cast<SCell>(topOfStack());
     topOfStack() = static_cast<Cell>(n1 - n2);
+    next();
 }
 
 // * ( n1 n2 -- n3 )
@@ -388,6 +490,7 @@ void star() {
     pop();
     auto n1 = static_cast<SCell>(topOfStack());
     topOfStack() = static_cast<Cell>(n1 * n2);
+    next();
 }
 
 // / ( n1 n2 -- n3 )
@@ -398,6 +501,7 @@ void slash() {
     auto n1 = static_cast<SCell>(topOfStack());
     RUNTIME_ERROR_IF(n2 == 0, "/: zero divisor");
     topOfStack() = static_cast<Cell>(n1 / n2);
+    next();
 }
 
 // /MOD ( n1 n2 -- n3 n4 )
@@ -409,12 +513,14 @@ void slashMod() {
     auto result = std::ldiv(n1, n2);
     dStack[dStack.size() - 2] = static_cast<Cell>(result.rem);
     topOfStack() = static_cast<Cell>(result.quot);
+    next();
 }
 
 // NEGATE ( n1 -- n2 )
 void negate() {
     REQUIRE_STACK_DEPTH(1, "NEGATE");
     topOfStack() = static_cast<Cell>(-static_cast<SCell>(topOfStack()));
+    next();
 }
 
 /*
@@ -429,6 +535,7 @@ void bitwiseAnd() {
     auto x2 = topOfStack();
     pop();
     topOfStack() = topOfStack() & x2;
+    next();
 }
 
 // OR ( x1 x2 -- x3 )
@@ -437,6 +544,7 @@ void bitwiseOr() {
     auto x2 = topOfStack();
     pop();
     topOfStack() = topOfStack() | x2;
+    next();
 }
 
 // XOR ( x1 x2 -- x3 )
@@ -445,12 +553,14 @@ void bitwiseXor() {
     auto x2 = topOfStack();
     pop();
     topOfStack() = topOfStack() ^ x2;
+    next();
 }
 
 // INVERT ( x1 -- x2 )
 void invert() {
     REQUIRE_STACK_DEPTH(1, "INVERT");
     topOfStack() = ~topOfStack();
+    next();
 }
 
 // LSHIFT ( x1 u -- x2 )
@@ -459,6 +569,7 @@ void lshift() {
     auto n = topOfStack();
     pop();
     topOfStack() <<= n;
+    next();
 }
 
 // RSHIFT ( x1 u -- x2 )
@@ -467,6 +578,7 @@ void rshift() {
     auto n = topOfStack();
     pop();
     topOfStack() >>= n;
+    next();
 }
 
 // = ( x1 x2 -- flag )
@@ -475,6 +587,7 @@ void equals() {
     auto n2 = topOfStack();
     pop();
     topOfStack() = topOfStack() == n2 ? True : False;
+    next();
 }
 
 // < ( n1 n2 -- flag )
@@ -483,6 +596,7 @@ void lessThan() {
     auto n2 = static_cast<SCell>(topOfStack());
     pop();
     topOfStack() = static_cast<SCell>(topOfStack()) < n2 ? True : False;
+    next();
 }
 
 // > ( n1 n2 -- flag )
@@ -491,6 +605,7 @@ void greaterThan() {
     auto n2 = static_cast<SCell>(topOfStack());
     pop();
     topOfStack() = static_cast<SCell>(topOfStack()) > n2 ? True : False;
+    next();
 }
 
 /*
@@ -504,6 +619,7 @@ void greaterThan() {
 // Not an ANS Forth word.
 void argCount() {
     push(commandLineArgCount);
+    next();
 }
 
 // ARG ( n -- c-addr u )
@@ -515,6 +631,7 @@ void argAtIndex() {
     auto value = commandLineArgVector[index];
     topOfStack() = CELL(value);
     push(std::strlen(value));
+    next();
 }
 
 /*
@@ -534,25 +651,13 @@ void bye() {
 
 */
 
-void doCreate() {
-    // TODO
-}
+void defineCodeWord(const char* name, Code code) {
+    alignDataPointer();
 
-void doConstant() {
-    // TODO
-}
-
-void doColon() {
-    // TODO
-}
-
-void defineCode(const char* name, Code code) {
     Word word;
     word.code = code;
+    word.parameter = AADDR(dataPointer);
     word.name = name;
-
-    align();
-    word.parameters = AADDR(dataPointer);
 
     dictionary.emplace_back(std::move(word));
 }
@@ -569,6 +674,8 @@ bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
 Word* findWord(CAddr nameToFind, Cell nameLength) {
     for (auto i = dictionary.rbegin(); i != dictionary.rend(); ++i) {
         auto& word = *i;
+        if (word.isHidden())
+            continue;
         auto& wordName = word.name;
         if (wordName.length() == nameLength) {
             auto wordNameCAddr = CADDR(const_cast<char*>(wordName.c_str()));
@@ -578,6 +685,21 @@ Word* findWord(CAddr nameToFind, Cell nameLength) {
         }
     }
     return nullptr;
+}
+
+// FIND ( c-addr -- c-addr 0  |  xt 1  |  xt -1 )
+void find() {
+    auto caddr = CADDR(topOfStack());
+    auto length = static_cast<Cell>(*caddr);
+    auto name = caddr + 1;
+    auto word = findWord(name, length);
+    if (word == nullptr) {
+        push(0);
+    }
+    else {
+        topOfStack() = CELL(word);
+        push(word->isImmediate() ? 1 : Cell(-1));
+    }
 }
 
 void words() {
@@ -590,7 +712,7 @@ void initializeDictionary() {
     dictionary.clear();
     dictionary.reserve(128);
 
-    static struct { const char* name; Code code; } primitives[] = {
+    static struct { const char* name; Code code; } codeWords[] = {
         {"!",       store},
         {"#ARG",    argCount},
         {"*",       star},
@@ -620,6 +742,7 @@ void initializeDictionary() {
         {"DROP",    drop},
         {"DUP",     dup},
         {"EMIT",    emit},
+        {"FIND",    find},
         {"HERE",    here},
         {"INVERT",  invert},
         {"KEY",     key},
@@ -637,8 +760,8 @@ void initializeDictionary() {
         {"WORDS",   words},
         {"XOR",     bitwiseXor}
     };
-    for (auto& p: primitives) {
-        defineCode(p.name, p.code);
+    for (auto& w: codeWords) {
+        defineCodeWord(w.name, w.code);
     }
 }
 

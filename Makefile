@@ -27,7 +27,7 @@ targets: $(BUILDDIR)/Makefile
 
 $(BUILDDIR)/Makefile: CMakeLists.txt Makefile
 	$(MKDIR) -p $(BUILDDIR)
-	cd $(BUILDDIR) && $(CMAKE) ..
+	cd $(BUILDDIR) && $(CMAKE) $(CMAKEFLAGS) ..
 
 .PHONY: optimized
 optimized: $(OPTIMIZEDDIR)/Makefile
@@ -35,7 +35,7 @@ optimized: $(OPTIMIZEDDIR)/Makefile
 
 $(OPTIMIZEDDIR)/Makefile: CMakeLists.txt Makefile
 	$(MKDIR) -p $(OPTIMIZEDDIR)
-	cd $(OPTIMIZEDDIR) && $(CMAKE) -DCXXFORTH_SKIP_RUNTIME_CHECKS=ON ..
+	cd $(OPTIMIZEDDIR) && $(CMAKE) $(CMAKEFLAGS) -DCXXFORTH_SKIP_RUNTIME_CHECKS=ON ..
 
 tags: cxxforth.cpp cxxforth.h
 	$(CTAGS) $^
