@@ -3,7 +3,7 @@ project(cxxforth)
 add_executable(cxxforth cxxforth.cpp)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS "-m32 -O3 -std=c++14 -Weverything -Wno-c++98-compat -Wno-unused-parameter -Wno-global-constructors -Wno-exit-time-destructors -Wno-unused-function -Wno-unused-const-variable -Wno-unused-macros -Wno-unused-member-function -Wno-unused-variable -Wno-padded -Wno-missing-noreturn")
+    set(CMAKE_CXX_FLAGS "-m32 -O3 -std=c++14 -Weverything -Wno-c++98-compat -Wno-unused-parameter -Wno-global-constructors -Wno-exit-time-destructors -Wno-unused-function -Wno-unused-const-variable -Wno-unused-macros -Wno-unused-member-function -Wno-unused-variable -Wno-padded -Wno-missing-noreturn -Wno-array-bounds-pointer-arithmetic")
     set(CMAKE_EXE_LINKER_FLAGS "-m32")
 else()
     # Settings for gcc
@@ -11,9 +11,14 @@ else()
     set(CMAKE_EXE_LINKER_FLAGS "-m32")
 endif()
 
-set(CXXFORTH_DATA_SIZE 65536 CACHE STRING "Size of Forth dataspace in bytes")
-option(CXXFORTH_SKIP_RUNTIME_CHECKS "Skip runtime checks" OFF)
-option(CXXFORTH_DISABLE_MAIN "Do not include a main() in cxxforth.cpp" OFF)
+set(CXXFORTH_DATASPACE_SIZE   65536  CACHE STRING "Size of Forth dataspace in bytes")
+set(CXXFORTH_DSTACK_COUNT       256  CACHE STRING "Maximum number of cells in Forth data stack")
+set(CXXFORTH_RSTACK_COUNT       256  CACHE STRING "Maximum number of cells in Forth return stack")
+set(CXXFORTH_DICTIONARY_COUNT  4096  CACHE STRING "Maximum number of words in Forth dictionary")
+
+option(CXXFORTH_SKIP_RUNTIME_CHECKS "Skip runtime checks"                     OFF)
+option(CXXFORTH_DISABLE_MAIN        "Do not include a main() in cxxforth.cpp" OFF)
+
 configure_file(cxxforthconfig.h.in cxxforthconfig.h)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
