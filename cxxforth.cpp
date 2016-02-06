@@ -92,8 +92,8 @@ constexpr AAddr rStackLimit     = &rStack[CXXFORTH_RSTACK_COUNT];
 constexpr Word* dictionaryLimit = &dictionary[CXXFORTH_DICTIONARY_COUNT];
 constexpr CAddr dataSpaceLimit  = &dataSpace[CXXFORTH_DATASPACE_SIZE];
 
-AAddr dStackTop = nullptr;
-AAddr rStackTop = nullptr;
+AAddr dTop = nullptr;
+AAddr rTop = nullptr;
 Word* latestDefinition = nullptr;
 CAddr dataPointer = nullptr;
 
@@ -113,11 +113,11 @@ const char** commandLineArgVector = nullptr;
 */
 
 std::ptrdiff_t dStackDepth() {
-    return dStackTop - dStack + 1;
+    return dTop - dStack + 1;
 }
 
 std::ptrdiff_t rStackDepth() {
-    return rStackTop - rStack + 1;
+    return rTop - rStack + 1;
 }
 
 #ifdef CXXFORTH_SKIP_RUNTIME_CHECKS
@@ -155,7 +155,7 @@ void requireDStackDepth(std::size_t n, const char* name) {
 }
 
 void requireDStackAvailable(std::size_t n, const char* name) {
-    RUNTIME_ERROR_IF((dStackTop + n) >= dStackLimit,
+    RUNTIME_ERROR_IF((dTop + n) >= dStackLimit,
                      std::string(name) + ": stack overflow");
 }
 
@@ -165,7 +165,7 @@ void requireRStackDepth(std::size_t n, const char* name) {
 }
 
 void requireRStackAvailable(std::size_t n, const char* name) {
-    RUNTIME_ERROR_IF((rStackTop + n) >= rStackLimit,
+    RUNTIME_ERROR_IF((rTop + n) >= rStackLimit,
                      std::string(name) + ": return stack overflow");
 }
 
@@ -189,32 +189,22 @@ void requireDataSpaceAvailable(std::size_t n, const char* name) {
 
 // Push cell onto data stack.
 void push(Cell x) {
-    *(++dStackTop) = x;
+    *(++dTop) = x;
 }
 
 // Pop cell from data stack.
 void pop() {
-    --dStackTop;
-}
-
-// Get reference to the top-of-stack cell.
-Cell& topOfStack() {
-    return *dStackTop;
+    --dTop;
 }
 
 // Push cell onto return stack.
 void rpush(Cell x) {
-    *(++rStackTop) = x;
+    *(++rTop) = x;
 }
 
 // Pop cell from return stack.
 void rpop() {
-    --rStackTop;
-}
-
-// Get reference to the top-of-stack cell on the return stack.
-Cell& topOfReturnStack() {
-    return *rStackTop;
+    --rTop;
 }
 
 /*
@@ -235,7 +225,7 @@ void doColon() {
 
 // EXIT ( -- ) ( R: nest-sys -- )
 void exit() {
-    nextWord = reinterpret_cast<Word*>(topOfReturnStack());
+    nextWord = reinterpret_cast<Word*>(*rTop);
     rpop();
     next();
 }
@@ -266,7 +256,7 @@ void drop() {
 void dup() {
     REQUIRE_DSTACK_DEPTH(1, "DUP");
     REQUIRE_DSTACK_AVAILABLE(1, "DUP");
-    push(topOfStack());
+    push(*dTop);
     next();
 }
 
@@ -274,50 +264,50 @@ void dup() {
 void over() {
     REQUIRE_DSTACK_DEPTH(2, "OVER");
     REQUIRE_DSTACK_AVAILABLE(1, "OVER");
-    push(*(dStackTop - 1));
+    push(*(dTop - 1));
     next();
 }
 
 // SWAP ( x1 x2 -- x2 x1 )
 void swap() {
     REQUIRE_DSTACK_DEPTH(2, "SWAP");
-    auto temp = topOfStack();
-    *dStackTop = *(dStackTop - 1);
-    *(dStackTop - 1) = temp;
+    auto temp = *dTop;
+    *dTop = *(dTop - 1);
+    *(dTop - 1) = temp;
     next();
 }
 
 // ROT ( x1 x2 x3 -- x2 x3 x1 )
 void rot() {
     REQUIRE_DSTACK_DEPTH(3, "ROT");
-    auto x1 = *(dStackTop - 2);
-    auto x2 = *(dStackTop - 1);
-    auto x3 = *dStackTop;
-    *dStackTop = x1;
-    *(dStackTop - 1) = x3;
-    *(dStackTop - 2) = x2;
+    auto x1 = *(dTop - 2);
+    auto x2 = *(dTop - 1);
+    auto x3 = *dTop;
+    *dTop = x1;
+    *(dTop - 1) = x3;
+    *(dTop - 2) = x2;
     next();
 }
 
 // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
 void pick() {
     REQUIRE_DSTACK_DEPTH(1, "PICK");
-    auto index = topOfStack();
+    auto index = *dTop;
     REQUIRE_DSTACK_DEPTH(index + 2, "PICK");
-    topOfStack() = *(dStackTop - index - 1);
+    *dTop = *(dTop - index - 1);
     next();
 }
 
 // ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
 void roll() {
     REQUIRE_DSTACK_DEPTH(1, "ROLL");
-    auto index = topOfStack();
+    auto index = *dTop;
     pop();
     if (index > 0) {
         REQUIRE_DSTACK_DEPTH(index + 1, "ROLL");
-        auto x = *(dStackTop - index - 1);
-        std::memmove(dStackTop - index - 1, dStackTop - index, index * sizeof(Cell));
-        topOfStack() = x;
+        auto x = *(dTop - index - 1);
+        std::memmove(dTop - index - 1, dTop - index, index * sizeof(Cell));
+        *dTop = x;
     }
     next();
 }
@@ -325,7 +315,7 @@ void roll() {
 // ?DUP ( x -- 0 | x x )
 void qdup() {
     REQUIRE_DSTACK_DEPTH(1, "?DUP");
-    Cell top = topOfStack();
+    Cell top = *dTop;
     if (top != 0) {
         REQUIRE_DSTACK_AVAILABLE(1, "?DUP");
         push(top);
@@ -337,7 +327,7 @@ void qdup() {
 void toR() {
     REQUIRE_DSTACK_DEPTH(1, ">R");
     REQUIRE_RSTACK_AVAILABLE(1, ">R");
-    rpush(topOfStack());
+    rpush(*dTop);
     pop();
     next();
 }
@@ -346,7 +336,7 @@ void toR() {
 void rFrom() {
     REQUIRE_RSTACK_DEPTH(1, "R>");
     REQUIRE_DSTACK_AVAILABLE(1, "R>");
-    push(topOfReturnStack());
+    push(*rTop);
     rpop();
     next();
 }
@@ -355,7 +345,7 @@ void rFrom() {
 void rFetch() {
     REQUIRE_RSTACK_DEPTH(1, "R@");
     REQUIRE_DSTACK_AVAILABLE(1, "R@");
-    push(topOfReturnStack());
+    push(*rTop);
     next();
 }
 
@@ -385,7 +375,7 @@ void align() {
 // ALIGNED ( addr -- a-addr )
 void aligned() {
     REQUIRE_DSTACK_DEPTH(1, "ALIGNED");
-    topOfStack() = CELL(alignAddress(topOfStack()));
+    *dTop = CELL(alignAddress(*dTop));
     next();
 }
 
@@ -401,7 +391,7 @@ void allot() {
     REQUIRE_DSTACK_DEPTH(1, "ALLOT");
     REQUIRE_VALID_HERE("ALLOT");
     REQUIRE_DATASPACE_AVAILABLE(CellSize, "ALLOT");
-    dataPointer += topOfStack();
+    dataPointer += *dTop;
     pop();
     next();
 }
@@ -409,14 +399,14 @@ void allot() {
 // CELL+ ( a-addr1 -- a-addr2 )
 void cellPlus() {
     REQUIRE_DSTACK_DEPTH(1, "CELL+");
-    topOfStack() += CellSize;
+    *dTop += CellSize;
     next();
 }
 
 // CELLS ( n1 -- n2 )
 void cells() {
     REQUIRE_DSTACK_DEPTH(1, "CELLS");
-    topOfStack() *= CellSize;
+    *dTop *= CellSize;
     next();
 }
 
@@ -432,7 +422,7 @@ void data(Cell x) {
 // , ( x -- )
 void comma() {
     REQUIRE_DSTACK_DEPTH(1, ",");
-    data(topOfStack());
+    data(*dTop);
     pop();
     next();
 }
@@ -449,7 +439,7 @@ void cdata(Cell x) {
 // C, ( char -- )
 void ccomma() {
     REQUIRE_DSTACK_DEPTH(1, "C,");
-    cdata(topOfStack());
+    cdata(*dTop);
     pop();
     next();
 }
@@ -463,10 +453,10 @@ void ccomma() {
 // ! ( x a-addr -- )
 void store() {
     REQUIRE_DSTACK_DEPTH(2, "!");
-    auto aaddr = AADDR(topOfStack());
+    auto aaddr = AADDR(*dTop);
     REQUIRE_ALIGNED(aaddr, "!");
     pop();
-    auto x = topOfStack();
+    auto x = *dTop;
     pop();
     *aaddr = x;
     next();
@@ -475,18 +465,18 @@ void store() {
 // @ ( a-addr -- x )
 void fetch() {
     REQUIRE_DSTACK_DEPTH(1, "@");
-    auto aaddr = AADDR(topOfStack());
+    auto aaddr = AADDR(*dTop);
     REQUIRE_ALIGNED(aaddr, "@");
-    topOfStack() = *aaddr;
+    *dTop = *aaddr;
     next();
 }
 
 // c! ( char c-addr -- )
 void cstore() {
     REQUIRE_DSTACK_DEPTH(2, "C!");
-    auto caddr = CADDR(topOfStack());
+    auto caddr = CADDR(*dTop);
     pop();
-    auto x = topOfStack();
+    auto x = *dTop;
     pop();
     *caddr = static_cast<Char>(x);
     next();
@@ -495,9 +485,9 @@ void cstore() {
 // c@ ( c-addr -- char )
 void cfetch() {
     REQUIRE_DSTACK_DEPTH(1, "C@");
-    auto caddr = CADDR(topOfStack());
+    auto caddr = CADDR(*dTop);
     REQUIRE_ALIGNED(caddr, "C@");
-    topOfStack() = static_cast<Cell>(*caddr);
+    *dTop = static_cast<Cell>(*caddr);
     next();
 }
 
@@ -510,7 +500,7 @@ void cfetch() {
 // EMIT ( x -- )
 void emit() {
     REQUIRE_DSTACK_DEPTH(1, "EMIT");
-    auto cell = topOfStack();
+    auto cell = *dTop;
     pop();
     std::cout.put(static_cast<char>(cell));
     next();
@@ -532,60 +522,60 @@ void key() {
 // + ( n1 n2 -- n3 )
 void plus() {
     REQUIRE_DSTACK_DEPTH(2, "+");
-    auto n2 = static_cast<SCell>(topOfStack());
+    auto n2 = static_cast<SCell>(*dTop);
     pop();
-    auto n1 = static_cast<SCell>(topOfStack());
-    topOfStack() = static_cast<Cell>(n1 + n2);
+    auto n1 = static_cast<SCell>(*dTop);
+    *dTop = static_cast<Cell>(n1 + n2);
     next();
 }
 
 // - ( n1 n2 -- n3 )
 void minus() {
     REQUIRE_DSTACK_DEPTH(2, "-");
-    auto n2 = static_cast<SCell>(topOfStack());
+    auto n2 = static_cast<SCell>(*dTop);
     pop();
-    auto n1 = static_cast<SCell>(topOfStack());
-    topOfStack() = static_cast<Cell>(n1 - n2);
+    auto n1 = static_cast<SCell>(*dTop);
+    *dTop = static_cast<Cell>(n1 - n2);
     next();
 }
 
 // * ( n1 n2 -- n3 )
 void star() {
     REQUIRE_DSTACK_DEPTH(2, "*");
-    auto n2 = static_cast<SCell>(topOfStack());
+    auto n2 = static_cast<SCell>(*dTop);
     pop();
-    auto n1 = static_cast<SCell>(topOfStack());
-    topOfStack() = static_cast<Cell>(n1 * n2);
+    auto n1 = static_cast<SCell>(*dTop);
+    *dTop = static_cast<Cell>(n1 * n2);
     next();
 }
 
 // / ( n1 n2 -- n3 )
 void slash() {
     REQUIRE_DSTACK_DEPTH(2, "/");
-    auto n2 = static_cast<SCell>(topOfStack());
+    auto n2 = static_cast<SCell>(*dTop);
     pop();
-    auto n1 = static_cast<SCell>(topOfStack());
+    auto n1 = static_cast<SCell>(*dTop);
     RUNTIME_ERROR_IF(n2 == 0, "/: zero divisor");
-    topOfStack() = static_cast<Cell>(n1 / n2);
+    *dTop = static_cast<Cell>(n1 / n2);
     next();
 }
 
 // /MOD ( n1 n2 -- n3 n4 )
 void slashMod() {
     REQUIRE_DSTACK_DEPTH(2, "/MOD");
-    auto n2 = static_cast<SCell>(*dStackTop);
-    auto n1 = static_cast<SCell>(*(dStackTop - 1));
+    auto n2 = static_cast<SCell>(*dTop);
+    auto n1 = static_cast<SCell>(*(dTop - 1));
     RUNTIME_ERROR_IF(n2 == 0, "/MOD: zero divisor");
     auto result = std::ldiv(n1, n2);
-    *(dStackTop - 1) = static_cast<Cell>(result.rem);
-    *dStackTop = static_cast<Cell>(result.quot);
+    *(dTop - 1) = static_cast<Cell>(result.rem);
+    *dTop = static_cast<Cell>(result.quot);
     next();
 }
 
 // NEGATE ( n1 -- n2 )
 void negate() {
     REQUIRE_DSTACK_DEPTH(1, "NEGATE");
-    topOfStack() = static_cast<Cell>(-static_cast<SCell>(topOfStack()));
+    *dTop = static_cast<Cell>(-static_cast<SCell>(*dTop));
     next();
 }
 
@@ -598,79 +588,79 @@ void negate() {
 // AND ( x1 x2 -- x3 )
 void bitwiseAnd() {
     REQUIRE_DSTACK_DEPTH(2, "AND");
-    auto x2 = topOfStack();
+    auto x2 = *dTop;
     pop();
-    topOfStack() = topOfStack() & x2;
+    *dTop = *dTop & x2;
     next();
 }
 
 // OR ( x1 x2 -- x3 )
 void bitwiseOr() {
     REQUIRE_DSTACK_DEPTH(2, "OR");
-    auto x2 = topOfStack();
+    auto x2 = *dTop;
     pop();
-    topOfStack() = topOfStack() | x2;
+    *dTop = *dTop | x2;
     next();
 }
 
 // XOR ( x1 x2 -- x3 )
 void bitwiseXor() {
     REQUIRE_DSTACK_DEPTH(2, "XOR");
-    auto x2 = topOfStack();
+    auto x2 = *dTop;
     pop();
-    topOfStack() = topOfStack() ^ x2;
+    *dTop = *dTop ^ x2;
     next();
 }
 
 // INVERT ( x1 -- x2 )
 void invert() {
     REQUIRE_DSTACK_DEPTH(1, "INVERT");
-    topOfStack() = ~topOfStack();
+    *dTop = ~*dTop;
     next();
 }
 
 // LSHIFT ( x1 u -- x2 )
 void lshift() {
     REQUIRE_DSTACK_DEPTH(2, "LSHIFT");
-    auto n = topOfStack();
+    auto n = *dTop;
     pop();
-    topOfStack() <<= n;
+    *dTop <<= n;
     next();
 }
 
 // RSHIFT ( x1 u -- x2 )
 void rshift() {
     REQUIRE_DSTACK_DEPTH(2, "RSHIFT");
-    auto n = topOfStack();
+    auto n = *dTop;
     pop();
-    topOfStack() >>= n;
+    *dTop >>= n;
     next();
 }
 
 // = ( x1 x2 -- flag )
 void equals() {
     REQUIRE_DSTACK_DEPTH(2, "=");
-    auto n2 = topOfStack();
+    auto n2 = *dTop;
     pop();
-    topOfStack() = topOfStack() == n2 ? True : False;
+    *dTop = *dTop == n2 ? True : False;
     next();
 }
 
 // < ( n1 n2 -- flag )
 void lessThan() {
     REQUIRE_DSTACK_DEPTH(2, "<");
-    auto n2 = static_cast<SCell>(topOfStack());
+    auto n2 = static_cast<SCell>(*dTop);
     pop();
-    topOfStack() = static_cast<SCell>(topOfStack()) < n2 ? True : False;
+    *dTop = static_cast<SCell>(*dTop) < n2 ? True : False;
     next();
 }
 
 // > ( n1 n2 -- flag )
 void greaterThan() {
     REQUIRE_DSTACK_DEPTH(2, ">");
-    auto n2 = static_cast<SCell>(topOfStack());
+    auto n2 = static_cast<SCell>(*dTop);
     pop();
-    topOfStack() = static_cast<SCell>(topOfStack()) > n2 ? True : False;
+    *dTop = static_cast<SCell>(*dTop) > n2 ? True : False;
     next();
 }
 
@@ -695,10 +685,10 @@ void argCount() {
 void argAtIndex() {
     REQUIRE_DSTACK_DEPTH(1, "ARG");
     REQUIRE_DSTACK_AVAILABLE(1, "ARG");
-    auto index = static_cast<size_t>(topOfStack());
+    auto index = static_cast<size_t>(*dTop);
     RUNTIME_ERROR_IF(index >= commandLineArgCount, "ARG: invalid index");
     auto value = commandLineArgVector[index];
-    topOfStack() = CELL(value);
+    *dTop = CELL(value);
     push(std::strlen(value));
     next();
 }
@@ -770,7 +760,7 @@ Word* findWord(CAddr nameToFind, Cell nameLength) {
 void find() {
     REQUIRE_DSTACK_DEPTH(1, "FIND");
     REQUIRE_DSTACK_AVAILABLE(1, "FIND");
-    auto caddr = CADDR(topOfStack());
+    auto caddr = CADDR(*dTop);
     auto length = static_cast<Cell>(*caddr);
     auto name = caddr + 1;
     auto word = findWord(name, length);
@@ -778,7 +768,7 @@ void find() {
         push(0);
     }
     else {
-        topOfStack() = CELL(word);
+        *dTop = CELL(word);
         push(word->isImmediate() ? 1 : Cell(-1));
     }
     next();
@@ -856,8 +846,8 @@ void initializeDictionary() {
 
 extern "C" void resetForth() {
 
-    dStackTop = dStack - 1;
-    rStackTop = rStack - 1;
+    dTop = dStack - 1;
+    rTop = rStack - 1;
 
     dataPointer = dataSpace;
 
