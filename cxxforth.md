@@ -1,4 +1,3 @@
-/****
 
 cxxforth: An Almost-Minimal Forth Implemented in C++14
 ======================================================
@@ -29,7 +28,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <http://unlicense.org/>
 
-****/
+'''C++
 
 #include "cxxforth.h"
 
@@ -145,11 +144,11 @@ size_t commandLineArgCount = 0;
 const char** commandLineArgVector = nullptr;
 
 
-/****
+'''
 
 Runtime checks
 
-****/
+'''C++
 
 std::ptrdiff_t dStackDepth() {
     return dTop - dStack + 1;
@@ -220,11 +219,11 @@ void requireDataSpaceAvailable(std::size_t n, const char* name) {
 
 #endif // CXXFORTH_SKIP_RUNTIME_CHECKS
 
-/****
+'''
 
 Stack manipulation primitives
 
-****/
+'''C++
 
 // Push cell onto data stack.
 void push(Cell x) {
@@ -246,11 +245,11 @@ void rpop() {
     --rTop;
 }
 
-/****
+'''
 
 Interpreter
 
-****/
+'''C++
 
 void next() {
     currentInstruction = nextInstruction;
@@ -278,11 +277,11 @@ void lit() {
     next();
 }
 
-/****
+'''
 
 Stack manipulation words
 
-****/
+'''C++
 
 // DROP ( x -- )
 void drop() {
@@ -388,11 +387,11 @@ void rFetch() {
     next();
 }
 
-/****
+'''
  
 Data space
 
-****/
+'''C++
 
 template<typename T>
 AAddr alignAddress(T addr) {
@@ -482,11 +481,11 @@ void ccomma() {
     next();
 }
 
-/****
+'''
 
 Memory access primitives
 
-****/
+'''C++
 
 // ! ( x a-addr -- )
 void store() {
@@ -529,11 +528,11 @@ void cfetch() {
     next();
 }
 
-/****
+'''
 
 I/O primitives
 
-****/
+'''C++
 
 // EMIT ( x -- )
 void emit() {
@@ -551,11 +550,11 @@ void key() {
     next();
 }
 
-/****
+'''
 
 Arithmetic primitives
 
-****/
+'''C++
 
 // + ( n1 n2 -- n3 )
 void plus() {
@@ -617,11 +616,11 @@ void negate() {
     next();
 }
 
-/****
+'''
 
 Logical and relational primitives
 
-****/
+'''C++
 
 // AND ( x1 x2 -- x3 )
 void bitwiseAnd() {
@@ -702,11 +701,11 @@ void greaterThan() {
     next();
 }
 
-/****
+'''
 
 Environmental primitives
 
-****/
+'''C++
 
 // #ARG ( -- n )
 // Provide count of command-line arguments.
@@ -731,22 +730,22 @@ void argAtIndex() {
     next();
 }
 
-/****
+'''
 
 Other system words
 
-****/
+'''C++
 
 // BYE ( -- )
 void bye() {
     std::exit(EXIT_SUCCESS);
 }
 
-/**** 
+'''
  
 Compilation
 
-****/
+'''C++
 
 // STATE ( -- a-addr )
 void state() {
@@ -910,3 +909,4 @@ int main(int argc, const char** argv) {
 #endif
 
 
+'''
