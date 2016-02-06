@@ -1,7 +1,7 @@
 /****
 
-cxxforth: An Almost-Minimal Forth Implemented in C++14
-======================================================
+cxxforth: A Simple Forth Implementation in C++
+==============================================
 
 by Kristopher Johnson
 
@@ -28,6 +28,66 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <http://unlicense.org/>
+
+----
+
+`cxxforth` is a simple implementation of a [Forth][forth] kernel in C++.  There
+are many examples of Forth implementations available on the Internet, but most
+of them are written in assembly language or low-level C, with a focus in
+maximizing efficiency and demonstrating traditional Forth implementation
+techniques.  This Forth is different: our goal is to use modern C++ to create a
+Forth implementation that is easy to understand and to extend.
+
+An inspiration for this implementation is [JONESFORTH[jonesforth].  JONESFORTH
+is a low-level assembly-language Forth implementation, so we aren't going to be
+using code from it, but it is written as a very readable tutorial, and we are
+going to copy that style.  Our Forth kernel is written as a C++ file, but we
+have a utility, `cpp2md` that will take that C++ file and convert it to a
+[Markdown][markdown] format document with nicely formatted commentary sections
+between the C++ code blocks.
+
+We are writing C++ conforming to the C++14 standard.  If your C++ compiler
+does not support C++14 yet, you may need to make some modifications to the code
+to get it to build.  Also, we use some POSIX functions, so if you are building
+for a non-POSIX platform, you may need to change a few of the function calls.
+
+[forth]: https://en.wikipedia.org/wiki/Forth_(programming_language) "Forth (programming language)"
+
+[jonesforth]: http://git.annexia.org/?p=jonesforth.git;a=blob;f=jonesforth.S;h=45e6e854a5d2a4c3f26af264dfce56379d401425;hb=HEAD
+
+[markdown]: https://daringfireball.net/projects/markdown/ "Markdown"
+
+----
+
+Building cxxforth
+-----------------
+
+Building the `cxxforth` executable and other targets is easiest if you are on a
+UNIX-ish system that has `make`, `cmake`, and `clang` or `gcc`.  If you have
+those components, you can probably build by just entering these commands:
+
+    cd myfiles/cxxforth
+    make
+
+If successful, the `cxxforth` executable will be built in the `cxxforth/build/`
+subdirectory.
+
+If you don't have one of those components, or if 'make' doesn't work, then it's
+not too hard to build it manually.  You will need to create a file called
+`cxxforthconfig.h`, which can be empty, then you need to invoke your C++
+compiler on the `cxxforth.cpp` source file, enabling whatever options might be
+needed for C++14 compatibility.  For example, on a Linux system with gcc, you
+should be able to build it by entering these commands:
+
+    cd myfiles/cxxforth
+    touch cxxforthconfig.h
+    g++ -std=c++14 -o cxxforth cxxforth.cpp
+
+----
+
+We start by including the headers for the C++ libraries we will be using.  We
+also include `cxxforth.h`, which declares exported functions and includes the
+`cxxforthconfig.h` file produced by the CMake build.
 
 ****/
 
