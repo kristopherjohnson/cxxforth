@@ -11,12 +11,12 @@ void convertToMarkdown(std::istream& input, std::ostream& output) {
     while (std::getline(input, line)) {
         if (line.find("/****") == 0) {
             if (inCPlusPlusSection) {
-                output << "'''\n";
+                output << "```\n";
             }
         }
         else if (line.find("****/") == 0) {
             inCPlusPlusSection = true;
-            output << "'''C++\n";
+            output << "```c++\n";
         }
         else {
             output << line << "\n";
@@ -24,7 +24,7 @@ void convertToMarkdown(std::istream& input, std::ostream& output) {
     }
 
     if (inCPlusPlusSection) {
-        output << "'''\n";
+        output << "```\n";
     }
 }
 
