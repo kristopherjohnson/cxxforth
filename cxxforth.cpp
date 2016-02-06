@@ -23,8 +23,8 @@ namespace {
 #define CXXFORTH_RSTACK_COUNT (256)
 #endif
 
-#ifndef CXXFORTH_DICTIONARY_COUNT
-#define CXXFORTH_DICTIONARY_COUNT (4096)
+#ifndef CXXFORTH_DEFINITIONS_COUNT
+#define CXXFORTH_DEFINITIONS_COUNT (4096)
 #endif
 
 using Cell = uintptr_t;
@@ -47,7 +47,7 @@ constexpr auto False = static_cast<Cell>(0);
 
 using Code = void(*)();
 
-struct Word {
+struct Definition {
     Code        code      = nullptr;
     AAddr       parameter = nullptr;
     Cell        flags     = 0;   
@@ -82,23 +82,23 @@ struct Word {
     }
 };
 
-Cell dStack[CXXFORTH_DSTACK_COUNT];
-Cell rStack[CXXFORTH_RSTACK_COUNT];
-Word dictionary[CXXFORTH_DICTIONARY_COUNT];
-Char dataSpace[CXXFORTH_DATASPACE_SIZE];
+Char       dataSpace[CXXFORTH_DATASPACE_SIZE];
+Cell       dStack[CXXFORTH_DSTACK_COUNT];
+Cell       rStack[CXXFORTH_RSTACK_COUNT];
+Definition dictionary[CXXFORTH_DEFINITIONS_COUNT];
 
-constexpr AAddr dStackLimit     = &dStack[CXXFORTH_DSTACK_COUNT];
-constexpr AAddr rStackLimit     = &rStack[CXXFORTH_RSTACK_COUNT];
-constexpr Word* dictionaryLimit = &dictionary[CXXFORTH_DICTIONARY_COUNT];
-constexpr CAddr dataSpaceLimit  = &dataSpace[CXXFORTH_DATASPACE_SIZE];
+constexpr CAddr       dataSpaceLimit  = &dataSpace[CXXFORTH_DATASPACE_SIZE];
+constexpr AAddr       dStackLimit     = &dStack[CXXFORTH_DSTACK_COUNT];
+constexpr AAddr       rStackLimit     = &rStack[CXXFORTH_RSTACK_COUNT];
+constexpr Definition* dictionaryLimit = &dictionary[CXXFORTH_DEFINITIONS_COUNT];
 
-AAddr dTop = nullptr;
-AAddr rTop = nullptr;
-Word* latestDefinition = nullptr;
-CAddr dataPointer = nullptr;
+CAddr       dataPointer = nullptr;
+AAddr       dTop = nullptr;
+AAddr       rTop = nullptr;
+Definition* latestDefinition = nullptr;
 
-Word* currentWord = nullptr;
-Word* nextWord = nullptr;
+Definition* currentInstruction = nullptr;
+Definition* nextInstruction = nullptr;
 
 Cell isCompiling = True;
 
@@ -214,18 +214,18 @@ void rpop() {
 */
 
 void next() {
-    currentWord = nextWord;
-    ++nextWord;
+    currentInstruction = nextInstruction;
+    ++nextInstruction;
 }
 
 void doColon() {
-    rpush(CELL(nextWord));
-    nextWord = reinterpret_cast<Word*>(currentWord->parameter);
+    rpush(CELL(nextInstruction));
+    nextInstruction = reinterpret_cast<Definition*>(currentInstruction->parameter);
 }
 
 // EXIT ( -- ) ( R: nest-sys -- )
 void exit() {
-    nextWord = reinterpret_cast<Word*>(*rTop);
+    nextInstruction = reinterpret_cast<Definition*>(*rTop);
     rpop();
     next();
 }
@@ -234,8 +234,8 @@ void exit() {
 // Compiled by LITERAL.
 // Not an ANS Forth word.
 void lit() {
-    push(CELL(nextWord));
-    ++nextWord;
+    push(CELL(nextInstruction));
+    ++nextInstruction;
     next();
 }
 
@@ -363,7 +363,6 @@ AAddr alignAddress(T addr) {
 
 void alignDataPointer() {
     dataPointer = CADDR(alignAddress(dataPointer));
-    REQUIRE_VALID_HERE("ALIGN");
 }
 
 // ALIGN ( -- )
@@ -741,15 +740,15 @@ bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
     return true;
 }
 
-Word* findWord(CAddr nameToFind, Cell nameLength) {
-    for (auto word = latestDefinition; word >= &dictionary[0]; ++word) {
-        if (word->isHidden())
+Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
+    for (auto defn = latestDefinition; defn >= dictionary; ++defn) {
+        if (defn->isHidden())
             continue;
-        auto& wordName = word->name;
-        if (wordName.length() == nameLength) {
-            auto wordNameCAddr = CADDR(const_cast<char*>(wordName.c_str()));
-            if (doNamesMatch(nameToFind, wordNameCAddr, nameLength)) {
-                return word;
+        auto& name = defn->name;
+        if (name.length() == nameLength) {
+            auto nameCAddr = CADDR(const_cast<char*>(name.c_str()));
+            if (doNamesMatch(nameToFind, nameCAddr, nameLength)) {
+                return defn;
             }
         }
     }
@@ -763,7 +762,7 @@ void find() {
     auto caddr = CADDR(*dTop);
     auto length = static_cast<Cell>(*caddr);
     auto name = caddr + 1;
-    auto word = findWord(name, length);
+    auto word = findDefinition(name, length);
     if (word == nullptr) {
         push(0);
     }
@@ -776,7 +775,7 @@ void find() {
 
 // WORDS ( -- )
 void words() {
-    for (auto word = latestDefinition; word >= &dictionary[0]; ++word) {
+    for (auto word = latestDefinition; word >= dictionary; ++word) {
         std::cout << word->name << " ";
     }
     next();
@@ -846,9 +845,13 @@ void initializeDictionary() {
 
 extern "C" void resetForth() {
 
+    std::memset(dStack, 0, sizeof(dStack));
     dTop = dStack - 1;
+
+    std::memset(rStack, 0, sizeof(rStack));
     rTop = rStack - 1;
 
+    std::memset(dataSpace, 0, sizeof(dataSpace));
     dataPointer = dataSpace;
 
     initializeDictionary();
