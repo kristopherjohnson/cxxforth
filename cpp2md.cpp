@@ -4,10 +4,15 @@ cpp2md is a simple utility that converts a C++ source file to a Markdown file.
 
 The rules it follows to do this are simple:
 
-- Text contained in lines between &#47;**** and ****&#47; are Markdown-format comments, and should be passed through unaltered to the Markdown output file.
-- All other lines are C++, and should be indented four spaces so they are treated as code.
+- Text contained in lines between `/ ****` and `**** /` are Markdown-format comments, and should be passed through unaltered to the Markdown output file.
+- All other lines are C++, and should be indented four spaces so they are treated as code blocks.
 
-The &#47;**** and ****&#47; tokens must be at the initial position on the line.
+The `/ ****` and `**** /` tokens must be at the initial position on the line.
+
+Note: The comment markers above are displayed above with a space between the
+`/` and `****`.  You must not include that space when writing comments, but we
+have to do it here so that the C++ compiler won't think we are trying to nest
+such comments within this comment block.
 
 ****/
 
