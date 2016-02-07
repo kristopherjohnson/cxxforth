@@ -61,13 +61,13 @@ such comments within this comment block.
             auto inpath = std::string(argv[1]);
             auto outpath = std::string(argv[2]);
             
-            auto infile = std::ifstream(inpath);
+            std::ifstream infile(inpath);
             if (!infile.is_open()) {
                 std::cerr << "cpp2md: unable to open input file \"" << inpath << "\"" << std::endl;
                 std::exit(EXIT_FAILURE);
             }
     
-            auto outfile = std::ofstream(outpath);
+            std::ofstream outfile(outpath);
             if (!outfile.is_open()) {
                 std::cerr << "cpp2md: unable to open output file \"" << outpath << "\"" << std::endl;
                 std::exit(EXIT_FAILURE);
