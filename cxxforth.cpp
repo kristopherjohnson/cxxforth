@@ -124,11 +124,14 @@ the `cxxforthconfig.h` file produced by the CMake build.
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 /****
 
@@ -970,6 +973,42 @@ void bye() {
     std::exit(EXIT_SUCCESS);
 }
 
+// MS ( u -- )
+void ms() {
+    REQUIRE_DSTACK_DEPTH(1, "MS");
+    auto period = *dTop;
+    pop();
+    std::this_thread::sleep_for(std::chrono::milliseconds(period));
+}
+
+// TIME&DATE ( -- +n1 +n2 +n3 +n4 +n5 +n6 )
+void timeAndDate () {
+    REQUIRE_DSTACK_AVAILABLE(6, "TIME&DATE");
+    auto t = std::time(0);
+    auto tm = std::localtime(&t);
+    push(static_cast<Cell>(tm->tm_sec));
+    push(static_cast<Cell>(tm->tm_min));
+    push(static_cast<Cell>(tm->tm_hour));
+    push(static_cast<Cell>(tm->tm_mday));
+    push(static_cast<Cell>(tm->tm_mon + 1));
+    push(static_cast<Cell>(tm->tm_year + 1900));
+}
+
+// UTCTIME&DATE ( -- +n1 +n2 +n3 +n4 +n5 +n6 )
+// Not an ANS Forth word.
+// Like TIME&DATE, but returns UTC rather than local time.
+void utcTimeAndDate () {
+    REQUIRE_DSTACK_AVAILABLE(6, "UTCTIME&DATE");
+    auto t = std::time(0);
+    auto tm = std::gmtime(&t);
+    push(static_cast<Cell>(tm->tm_sec));
+    push(static_cast<Cell>(tm->tm_min));
+    push(static_cast<Cell>(tm->tm_hour));
+    push(static_cast<Cell>(tm->tm_mday));
+    push(static_cast<Cell>(tm->tm_mon + 1));
+    push(static_cast<Cell>(tm->tm_year + 1900));
+}
+
 /**** 
  
 Compilation
@@ -1050,56 +1089,59 @@ working system.
 
 void definePrimitives() {
     static struct { const char* name; Code code; } codeWords[] = {
-        {"!",           store},
-        {"#ARG",        argCount},
-        {"(literal)",   doLiteral},
-        {"*",           star},
-        {"+",           plus},
-        {"-",           minus},
-        {"/",           slash},
-        {"/MOD",        slashMod},
-        {"<",           lessThan},
-        {"=",           equals},
-        {">",           greaterThan},
-        {">IN",         in},
-        {">R",          toR},
-        {"?DUP",        qdup},
-        {"@",           fetch},
-        {"ALIGN",       align},
-        {"ALIGNED",     aligned},
-        {"ALLOT",       allot},
-        {"AND",         bitwiseAnd},
-        {"ARG",         argAtIndex},
-        {"BYE",         bye},
-        {"C!",          cstore},
-        {"C@",          cfetch},
-        {"CELL+",       cellPlus},
-        {"CELLS",       cells},
-        {"DEPTH",       depth},
-        {"DROP",        drop},
-        {"DUP",         dup},
-        {"EMIT",        emit},
-        {"EXIT",        exit},
-        {"FIND",        find},
-        {"HERE",        here},
-        {"INVERT",      invert},
-        {"LSHIFT",      lshift},
-        {"NEGATE",      negate},
-        {"OR",          bitwiseOr},
-        {"OVER",        over},
-        {"PICK",        pick},
-        {"R>",          rFrom},
-        {"R@",          rFetch},
-        {"REFILL",      refill},
-        {"ROLL",        roll},
-        {"ROT",         rot},
-        {"RSHIFT",      rshift},
-        {"SOURCE",      source},
-        {"STATE",       state},
-        {"SWAP",        swap},
-        {"UNUSED",      unused},
-        {"WORDS",       words},
-        {"XOR",         bitwiseXor}
+        {"!",             store},
+        {"#ARG",          argCount},
+        {"(literal)",     doLiteral},
+        {"*",             star},
+        {"+",             plus},
+        {"-",             minus},
+        {"/",             slash},
+        {"/MOD",          slashMod},
+        {"<",             lessThan},
+        {"=",             equals},
+        {">",             greaterThan},
+        {">IN",           in},
+        {">R",            toR},
+        {"?DUP",          qdup},
+        {"@",             fetch},
+        {"ALIGN",         align},
+        {"ALIGNED",       aligned},
+        {"ALLOT",         allot},
+        {"AND",           bitwiseAnd},
+        {"ARG",           argAtIndex},
+        {"BYE",           bye},
+        {"C!",            cstore},
+        {"C@",            cfetch},
+        {"CELL+",         cellPlus},
+        {"CELLS",         cells},
+        {"DEPTH",         depth},
+        {"DROP",          drop},
+        {"DUP",           dup},
+        {"EMIT",          emit},
+        {"EXIT",          exit},
+        {"FIND",          find},
+        {"HERE",          here},
+        {"INVERT",        invert},
+        {"LSHIFT",        lshift},
+        {"MS",            ms},
+        {"NEGATE",        negate},
+        {"OR",            bitwiseOr},
+        {"OVER",          over},
+        {"PICK",          pick},
+        {"R>",            rFrom},
+        {"R@",            rFetch},
+        {"REFILL",        refill},
+        {"ROLL",          roll},
+        {"ROT",           rot},
+        {"RSHIFT",        rshift},
+        {"SOURCE",        source},
+        {"STATE",         state},
+        {"SWAP",          swap},
+        {"TIME&DATE",     timeAndDate},
+        {"UNUSED",        unused},
+        {"UTCTIME&DATE",  utcTimeAndDate},
+        {"WORDS",         words},
+        {"XOR",           bitwiseXor}
     };
     for (auto& w: codeWords) {
         defineCodeWord(w.name, w.code);
