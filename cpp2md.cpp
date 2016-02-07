@@ -1,3 +1,16 @@
+/****
+
+cpp2md is a simple utility that converts a C++ source file to a Markdown file.
+
+The rules it follows to do this are simple:
+
+- Text contained in lines between &#47;**** and ****&#47; are Markdown-format comments, and should be passed through unaltered to the Markdown output file.
+- All other lines are C++, and should be indented four spaces so they are treated as code.
+
+The &#47;**** and ****&#47; tokens must be at the initial position on the line.
+
+****/
+
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -10,21 +23,16 @@ void convertToMarkdown(std::istream& input, std::ostream& output) {
     std::string line;
     while (std::getline(input, line)) {
         if (line.find("/****") == 0) {
-            if (inCPlusPlusSection) {
-                output << "```\n";
-            }
+            inCPlusPlusSection = false;
         }
         else if (line.find("****/") == 0) {
             inCPlusPlusSection = true;
-            output << "```c++\n";
         }
         else {
+            if (inCPlusPlusSection)
+                output << "    ";
             output << line << "\n";
         }   
-    }
-
-    if (inCPlusPlusSection) {
-        output << "```\n";
     }
 }
 
@@ -58,7 +66,7 @@ int main(int argc, const char** argv) {
 
         auto outfile = std::ofstream(outpath);
         if (!outfile.is_open()) {
-            std::cerr << "cpp2md: unable to open output file \"" << outpath[2] << "\"" << std::endl;
+            std::cerr << "cpp2md: unable to open output file \"" << outpath << "\"" << std::endl;
             std::exit(EXIT_FAILURE);
         }
 
@@ -70,7 +78,7 @@ int main(int argc, const char** argv) {
         return 0;
     }
     catch (const std::exception& ex) {
-        std::cerr << "libcpp: " << ex.what() << std::endl;
+        std::cerr << "cpp2md: " << ex.what() << std::endl;
         std::exit(EXIT_FAILURE);
     }
 }

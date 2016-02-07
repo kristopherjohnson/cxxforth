@@ -101,7 +101,8 @@ should be able to build it by entering these commands:
 
 ----
 
-On to the code.
+The Code
+--------
 
 We start by including headers from the C++ Standard Library.  We also include
 `cxxforth.h`, which declares exported functions and includes the
@@ -161,6 +162,13 @@ unsigned integer, a signed integer, or a variety of other uses.  However, in
 C++ we will have to be explicit about types depending on what operations we are
 performing.  So, we define a few types, and a few macros to avoid littering our
 code with `reinterpret_cast<>`.
+
+By the way, we won't be providign any of the double-cell operations that
+traditional Forths provide.  Double-cell operations were important in the days
+of 8-bit and 16-bit Forths, but with cells of 32 bits or more, many
+applications have no need for them.
+
+We also aren't dealing with floating-point values.  (Maybe someday...)
 
 ****/
 
@@ -280,17 +288,17 @@ constexpr Definition* dictionaryLimit = &dictionary[CXXFORTH_DEFINITIONS_COUNT];
 
 /****
 
-For each of the global arrays, we have a pointer to the current location.
+For each of the global arrays, we need a pointer to the current location.
 
 For the data space, we have the `dataPointer`, which corresponds to Forth's
 `HERE`.
 
-For each of the stacks, we have a pointer to the element at the top of the
+For each of the stacks, we need a pointer to the element at the top of the
 stack.  The stacks grow upward.  When a stack is empty, the associated pointer
 points to an address below the actual bottom of the array, so we will need to
 avoid dereferencing these pointers under those circumstances.
 
-Finally, we have a pointer to the last member of the `Definition` array.  As
+Finally, we need a pointer to the last member of the `Definition` array.  As
 with the stack pointers, this pointer is not valid when the dictionary is
 empty, but we don't need to worry much about it because the array won't be
 empty after it is initialized with the kernel's built-in words.
@@ -323,7 +331,28 @@ const char** commandLineArgVector = nullptr;
 
 /****
 
-Runtime checks
+Runtime Safety Checks
+---------------------
+
+Old-school Forths are apparently implemented by super-programmers who never
+make coding mistakes and so don't want the overhead of bounds-checking or other
+nanny hand-holding.  However, we're just dumb C++ programmers here, and we'd
+like to have some say to catch our mistakes.
+
+To that end, we have a set of macros and functions that verify that we have the
+expected number of arguments available on our stacks, that we aren't going to
+run off the end of an array, that we aren't going to try to divide by zero, and
+so on.
+
+We can define the macro `CXXFORTH_SKIP_RUNTIME_CHECKS` to generate an
+executable that doesn't include these checks, so when we have a fully debugged
+Forth application we can run it on that optimized executable for improvied
+performance.
+
+When the `CXXFORTH_SKIP_RUNTIME_CHECKS` macro is not defined, these macros
+will check conditions and throw a `std::runtime_error` if the assertions fail.
+We won't go into the details of these macros here.  Later you will see them
+used in the definitions of our primitive Forth words.
 
 ****/
 
@@ -346,6 +375,7 @@ std::ptrdiff_t rStackDepth() {
 #define REQUIRE_ALIGNED(addr, name)          do { } while (0)
 #define REQUIRE_VALID_HERE(name)             do { } while (0)
 #define REQUIRE_DATASPACE_AVAILABLE(n, name) do { } while (0)
+
 #else
 
 #define RUNTIME_ERROR(msg)                   do { throw std::runtime_error(msg); } while (0)
@@ -398,7 +428,14 @@ void requireDataSpaceAvailable(std::size_t n, const char* name) {
 
 /****
 
-Stack manipulation primitives
+Stack Manipulation Primitives
+-----------------------------
+
+We will be spending a lot of time pushing and popping values to and from our
+data and return stacks, so in lieu of sprinkling pointer arithmetic all through
+our code, we'll define a few simple functions to handle those operations.  We
+can expect the compiler to expand calls to these functions inline, so we aren't
+losing any efficiency.
 
 ****/
 
@@ -425,6 +462,30 @@ void rpop() {
 /****
 
 Interpreter
+-----------
+
+Now we get to some of the most important operations in a Forth system.  They
+look very simple, but these functions are going to implement the interpreter
+that executes compiled Forth definitions.
+
+There are basically two kinds of words in a Forth system:
+
+- code: native code fragments that are executed directly by the CPU
+- colon definitions: a sequence of Forth words compiled by the `:` (colon) operator
+
+Every defined word has a `code` field that points to native code.  In the case
+of "code" words, the `code` field points to a routine that performs the
+operation.  In the case of a colon definition, the `code` field points to the
+`doColon()` function, which saves the current program state and then starts
+executing the words that make up the colon definition.
+
+Each of our code words ends with a call to the `next()` function, which sets
+everything up to execute the next instruction, whether that is the following
+instruction in the current colon definition, or the next instruction in a colon
+definition that called the current colon definition.
+
+Each colon definition ends with a call to `EXIT`, which sets up a return to the
+colon definition that called the current word.
 
 ****/
 

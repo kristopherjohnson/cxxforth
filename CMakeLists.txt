@@ -11,6 +11,13 @@ add_custom_target(cxxforth.cpp.md ALL build/cpp2md cxxforth.cpp cxxforth.cpp.md
   SOURCES cxxforth.cpp
 )
 
+add_custom_target(cpp2md.cpp.md ALL build/cpp2md cpp2md.cpp cpp2md.cpp.md
+  DEPENDS cpp2md
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Generate cpp2md.cpp.md" VERBATIM
+  SOURCES cpp2md.cpp
+)
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "-m32 -O3 -std=c++14 -Weverything -Wno-c++98-compat -Wno-unused-parameter -Wno-global-constructors -Wno-exit-time-destructors -Wno-unused-function -Wno-unused-const-variable -Wno-unused-macros -Wno-unused-member-function -Wno-unused-variable -Wno-padded -Wno-missing-noreturn -Wno-array-bounds-pointer-arithmetic")
     set(CMAKE_EXE_LINKER_FLAGS "-m32")
