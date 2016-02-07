@@ -142,8 +142,8 @@ in case they have not been defined.
     #define CXXFORTH_DATASPACE_SIZE (16 * 1024 * sizeof(Cell))
     #endif
     
-    #ifndef CXXFORTH_RSTACK_COUNT
-    #define CXXFORTH_RSTACK_COUNT (256)
+    #ifndef CXXFORTH_DSTACK_COUNT
+    #define CXXFORTH_DSTACK_COUNT (256)
     #endif
     
     #ifndef CXXFORTH_RSTACK_COUNT
