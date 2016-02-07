@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4E534CFB1C5B03A400E32758 /* cxxforth.c in Sources */ = {isa = PBXBuildFile; fileRef = 4E534CF61C5B03A400E32758 /* cxxforth.c */; };
-		4E534CFC1C5B03A400E32758 /* forth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4E534CF71C5B03A400E32758 /* forth.cpp */; };
+		4E90D4C01C67DD590064FE48 /* cxxforth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4E90D4BE1C67DD590064FE48 /* cxxforth.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,12 +25,11 @@
 /* Begin PBXFileReference section */
 		4E534CEB1C5B031800E32758 /* cxxforth */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cxxforth; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E534CF51C5B03A400E32758 /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = CMakeLists.txt; path = ../CMakeLists.txt; sourceTree = "<group>"; };
-		4E534CF61C5B03A400E32758 /* cxxforth.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cxxforth.c; path = ../cxxforth.c; sourceTree = "<group>"; };
-		4E534CF71C5B03A400E32758 /* forth.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = forth.cpp; path = ../forth.cpp; sourceTree = "<group>"; };
-		4E534CF81C5B03A400E32758 /* forth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = forth.h; path = ../forth.h; sourceTree = "<group>"; };
 		4E534CF91C5B03A400E32758 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; name = Makefile; path = ../Makefile; sourceTree = "<group>"; };
 		4E534CFA1C5B03A400E32758 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
-		4E534D001C5B040200E32758 /* forthconfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = forthconfig.h; path = ../build/forthconfig.h; sourceTree = "<group>"; };
+		4E90D4BD1C67DD590064FE48 /* cxxforthconfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cxxforthconfig.h; path = ../build/cxxforthconfig.h; sourceTree = "<group>"; };
+		4E90D4BE1C67DD590064FE48 /* cxxforth.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = cxxforth.cpp; path = ../cxxforth.cpp; sourceTree = "<group>"; };
+		4E90D4BF1C67DD590064FE48 /* cxxforth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cxxforth.h; path = ../cxxforth.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,11 +62,10 @@
 		4E534CFF1C5B03C100E32758 /* cxxforth */ = {
 			isa = PBXGroup;
 			children = (
+				4E90D4BD1C67DD590064FE48 /* cxxforthconfig.h */,
+				4E90D4BE1C67DD590064FE48 /* cxxforth.cpp */,
+				4E90D4BF1C67DD590064FE48 /* cxxforth.h */,
 				4E534CF51C5B03A400E32758 /* CMakeLists.txt */,
-				4E534CF61C5B03A400E32758 /* cxxforth.c */,
-				4E534CF71C5B03A400E32758 /* forth.cpp */,
-				4E534CF81C5B03A400E32758 /* forth.h */,
-				4E534D001C5B040200E32758 /* forthconfig.h */,
 				4E534CF91C5B03A400E32758 /* Makefile */,
 				4E534CFA1C5B03A400E32758 /* README.md */,
 			);
@@ -131,8 +128,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4E534CFB1C5B03A400E32758 /* cxxforth.c in Sources */,
-				4E534CFC1C5B03A400E32758 /* forth.cpp in Sources */,
+				4E90D4C01C67DD590064FE48 /* cxxforth.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
