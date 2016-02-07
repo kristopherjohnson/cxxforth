@@ -489,9 +489,15 @@ colon definition that called the current word.
 
 ****/
 
+void processInstructions() {
+    while (currentInstruction != nullptr) {
+        currentInstruction->code();
+    }
+    throw std::runtime_error("No instructions to process");
+}
+
 void next() {
-    currentInstruction = nextInstruction;
-    ++nextInstruction;
+    currentInstruction = nextInstruction++;
 }
 
 void doColon() {
@@ -517,7 +523,10 @@ void lit() {
 
 /****
 
-Stack manipulation words
+Next we'll define the basic Forth stack manipulation words.  Where possible, we
+don't change the stack depth any more than necessary.  For example, `SWAP` and
+`DROP` just rearrange elements on the stack, rather than doing any popping or
+pushing.
 
 ****/
 
@@ -626,8 +635,57 @@ void rFetch() {
 }
 
 /****
+
+Another important set of Forth primitives are those for reading and writing
+values in data space.
+
+****/
+
+// ! ( x a-addr -- )
+void store() {
+    REQUIRE_DSTACK_DEPTH(2, "!");
+    auto aaddr = AADDR(*dTop);
+    REQUIRE_ALIGNED(aaddr, "!");
+    pop();
+    auto x = *dTop;
+    pop();
+    *aaddr = x;
+    next();
+}
+
+// @ ( a-addr -- x )
+void fetch() {
+    REQUIRE_DSTACK_DEPTH(1, "@");
+    auto aaddr = AADDR(*dTop);
+    REQUIRE_ALIGNED(aaddr, "@");
+    *dTop = *aaddr;
+    next();
+}
+
+// c! ( char c-addr -- )
+void cstore() {
+    REQUIRE_DSTACK_DEPTH(2, "C!");
+    auto caddr = CADDR(*dTop);
+    pop();
+    auto x = *dTop;
+    pop();
+    *caddr = static_cast<Char>(x);
+    next();
+}
+
+// c@ ( c-addr -- char )
+void cfetch() {
+    REQUIRE_DSTACK_DEPTH(1, "C@");
+    auto caddr = CADDR(*dTop);
+    REQUIRE_ALIGNED(caddr, "C@");
+    *dTop = static_cast<Cell>(*caddr);
+    next();
+}
+
+/****
  
-Data space
+Now we will define the Forth words for accessing and manipulating the data
+space pointer.
 
 ****/
 
@@ -721,54 +779,7 @@ void ccomma() {
 
 /****
 
-Memory access primitives
-
-****/
-
-// ! ( x a-addr -- )
-void store() {
-    REQUIRE_DSTACK_DEPTH(2, "!");
-    auto aaddr = AADDR(*dTop);
-    REQUIRE_ALIGNED(aaddr, "!");
-    pop();
-    auto x = *dTop;
-    pop();
-    *aaddr = x;
-    next();
-}
-
-// @ ( a-addr -- x )
-void fetch() {
-    REQUIRE_DSTACK_DEPTH(1, "@");
-    auto aaddr = AADDR(*dTop);
-    REQUIRE_ALIGNED(aaddr, "@");
-    *dTop = *aaddr;
-    next();
-}
-
-// c! ( char c-addr -- )
-void cstore() {
-    REQUIRE_DSTACK_DEPTH(2, "C!");
-    auto caddr = CADDR(*dTop);
-    pop();
-    auto x = *dTop;
-    pop();
-    *caddr = static_cast<Char>(x);
-    next();
-}
-
-// c@ ( c-addr -- char )
-void cfetch() {
-    REQUIRE_DSTACK_DEPTH(1, "C@");
-    auto caddr = CADDR(*dTop);
-    REQUIRE_ALIGNED(caddr, "C@");
-    *dTop = static_cast<Cell>(*caddr);
-    next();
-}
-
-/****
-
-I/O primitives
+Define I/O primitives.
 
 ****/
 
@@ -781,16 +792,9 @@ void emit() {
     next();
 }
 
-// KEY ( -- x )
-void key() {
-    REQUIRE_DSTACK_AVAILABLE(1, "KEY");
-    push(static_cast<Cell>(std::cin.get()));
-    next();
-}
-
 /****
 
-Arithmetic primitives
+Define arithmetic primitives.
 
 ****/
 
@@ -856,7 +860,7 @@ void negate() {
 
 /****
 
-Logical and relational primitives
+Define logical and relational primitives.
 
 ****/
 
@@ -941,7 +945,7 @@ void greaterThan() {
 
 /****
 
-Environmental primitives
+Define system and environmental primitives
 
 ****/
 
@@ -968,12 +972,6 @@ void argAtIndex() {
     next();
 }
 
-/****
-
-Other system words
-
-****/
-
 // BYE ( -- )
 void bye() {
     std::exit(EXIT_SUCCESS);
@@ -982,6 +980,7 @@ void bye() {
 /**** 
  
 Compilation
+-----------
 
 ****/
 
@@ -1090,7 +1089,6 @@ void initializeDictionary() {
         {"FIND",    find},
         {"HERE",    here},
         {"INVERT",  invert},
-        {"KEY",     key},
         {"LSHIFT",  lshift},
         {"NEGATE",  negate},
         {"OR",      bitwiseOr},
