@@ -5,6 +5,10 @@
 # - targets    builds cxxforth executable
 # - optimized  builds cxxforth with runtime checks disabled
 # - clean      removes build products
+#
+# On a 64-bit platform, invoke make like this to build a 32-bit Forth:
+#
+#   CMAKEFLAGS=-DCXXFORTH_32BIT=ON make all
 
 CMAKE ?= cmake
 MKDIR ?= mkdir

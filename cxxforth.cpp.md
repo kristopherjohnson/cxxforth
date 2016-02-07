@@ -34,35 +34,46 @@ For more information, please refer to <http://unlicense.org/>
 are many examples of Forth implementations available on the Internet, but most
 of them are written in assembly language or low-level C, with a focus in
 maximizing efficiency and demonstrating traditional Forth implementation
-techniques.  This Forth is different: our goal is to use modern C++ to create a
-Forth implementation that is easy to understand and to extend.
+techniques.  This Forth is different: Our goal is to use modern C++ to create a
+Forth implementation that is easy to understand, easy to port, and easy to
+extend.  We're not going to talk about register assignments or addressing modes
+or opcodes or the trade-offs between indirect threaded code, direct threaded
+code, subroutine threaded code, and token threaded code.  We are just going to
+build a working Forth system in a couple thousand lines of code.
 
-An inspiration for this implementation is [JONESFORTH][jonesforth].  JONESFORTH
-is a low-level assembly-language Forth implementation, so we aren't going to be
-using code from it, but it is written as a very readable tutorial, and we are
-going to copy that style.  Our Forth kernel is written as a C++ file, but we
-have a utility, `cpp2md` that will take that C++ file and convert it to a
-[Markdown][markdown] format document with nicely formatted commentary sections
-between the C++ code blocks.  If you are currently reading `cxxforth.cpp` online,
-consider reading <cxxforth.cpp.md> instead, as BitBucket or GitHub
-will automtically display the Markdown file as formatted HTML.
+An inspiration for this implementation is Richard W.M. Jones's
+[JONESFORTH][jonesforth].  JONESFORTH is a low-level assembly-language Forth
+implementation, so we aren't going to be using code from it, but it is written
+as a very readable tutorial, and we are going to copy its style.  Our Forth
+kernel is written as an extensively commented C++ file, and we have a utility,
+`cpp2md`, that will take that C++ file and convert it to a [Markdown][markdown]
+format document with nicely formatted commentary sections between the C++ code
+blocks.  If you are currently reading `cxxforth.cpp` online, consider reading
+the Markdown file [cxxforth.cpp.md](cxxforth.cpp.md) instead, as BitBucket or
+GitHub will automtically display the Markdown file as formatted HTML.
+
+As in other Forth systems, the basic design of this Forth is to create a small
+kernel in native code (C++, in our case), and then implement the rest of the
+system with Forth code.  The kernel has to provide the basic primitives needed
+for memory access, arithmetic, and operating system access.  With those
+primitives, we can then write Forth code to flesh out the system.
 
 We are writing C++ conforming to the C++14 standard.  If your C++ compiler
 does not support C++14 yet, you may need to make some modifications to the code
-to get it to build.  Also, we use some POSIX functions, so if you are building
-for a non-POSIX platform, you may need to change a few of the function calls.
+to get it to build.
 
 The Forth words provided by cxxforth are based on those in the
 [ANS Forth draft standard][dpans].  We don't officially claim any conformance
 to the standard, but the reader can use the draft standard as a crude form of
 documentation for the Forth words we implement.  cxxforth implements many of
-the words from the standard's Core and Core Extensio word sets, and a
+the words from the standard's Core and Core Extension word sets, and a
 smattering of words from other standard word sets.
 
 It is assumed that the reader has some familiarity and interest in C++ and
 Forth.  It is recommended that the reader first read the JONESFORTH source or
 the source of some other Forth implementation to get the basic gist of how
-Forth is usually implemented.
+Forth is usually implemented, but our hope is that you can understand the
+comments and code in this file.
 
 [forth]: https://en.wikipedia.org/wiki/Forth_(programming_language) "Forth (programming language)"
 
@@ -103,9 +114,9 @@ should be able to build it by entering these commands:
 The Code
 --------
 
-We start by including headers from the C++ Standard Library.  We also include
-`cxxforth.h`, which declares exported functions and includes the
-`cxxforthconfig.h` file produced by the CMake build.
+In `cxxforth.cpp`, we start by including headers from the C++ Standard Library.
+We also include `cxxforth.h`, which declares exported functions and includes
+the `cxxforthconfig.h` file produced by the CMake build.
 
     
     #include "cxxforth.h"
@@ -129,11 +140,11 @@ in case they have not been defined.
 
     
     #ifndef CXXFORTH_DATA_SIZE
-    #define CXXFORTH_DATA_SIZE (64 * 1024)
+    #define CXXFORTH_DATA_SIZE (16 * 1024 * sizeof(Cell))
     #endif
     
     #ifndef CXXFORTH_RSTACK_COUNT
-    #define CXXFORTH_SRTACK_COUNT (256)
+    #define CXXFORTH_RSTACK_COUNT (256)
     #endif
     
     #ifndef CXXFORTH_RSTACK_COUNT
@@ -148,17 +159,17 @@ in case they have not been defined.
 We'll start by defining some basic types.  A `Cell` is the basic Forth type.
 We define our cell using the C++ `uintptr_t` type to ensure it is large enough
 to hold an address.  This generally means that it will be a 32-bit value on
-32-bit platforms and a 64-bit value on 64-bit platforms.  (Note: Our CMake file
-will actually force a 32-bit build on a 64-bit platform, but you can disable
-that if you really do want a 64-bit Forth.)
+32-bit platforms and a 64-bit value on 64-bit platforms.  (If you want to build
+a 32-bit Forth on a 64-bit platform with clang or gcc, you can pass the `-m32`
+flag to the compiler and linker.)
 
 Forth doesn't require type declarations; a cell can be used as an address, an
 unsigned integer, a signed integer, or a variety of other uses.  However, in
 C++ we will have to be explicit about types depending on what operations we are
 performing.  So, we define a few types, and a few macros to avoid littering our
-code with `reinterpret_cast<>`.
+code with `reinterpret_cast<>()`.
 
-By the way, we won't be providign any of the double-cell operations that
+By the way, we won't be providing any of the double-cell operations that
 traditional Forths provide.  Double-cell operations were important in the days
 of 8-bit and 16-bit Forths, but with cells of 32 bits or more, many
 applications have no need for them.
@@ -210,6 +221,10 @@ associated with the word, a `parameter` field that points to the data-space
 elements associated with the word, and some bit flags to keep track of whether
 the word is IMMEDIATE and/or HIDDEN.  We will explore the use of these fields
 later when we talk about the interpreter.
+
+Note that the `code` field is the first member of the `Definition` struct.
+This means that the address of a `Definition` is also the address of a code
+field.  We will use such an address as our Forth _execution token_ (xt).
 
     
     using Code = void(*)(void);
@@ -309,6 +324,9 @@ We also need a flag to track whether we are in interpreting or compiling state
     
     Cell isCompiling = True;
     
+    std::string inputBuffer;
+    Cell inputOffset = 0;
+    
     size_t commandLineArgCount = 0;
     const char** commandLineArgVector = nullptr;
     
@@ -320,7 +338,7 @@ Runtime Safety Checks
 Old-school Forths are apparently implemented by super-programmers who never
 make coding mistakes and so don't want the overhead of bounds-checking or other
 nanny hand-holding.  However, we're just dumb C++ programmers here, and we'd
-like to have some say to catch our mistakes.
+like some help to catch our mistakes.
 
 To that end, we have a set of macros and functions that verify that we have the
 expected number of arguments available on our stacks, that we aren't going to
@@ -449,8 +467,8 @@ that executes compiled Forth definitions.
 
 There are basically two kinds of words in a Forth system:
 
-- code: native code fragments that are executed directly by the CPU
-- colon definitions: a sequence of Forth words compiled by the `:` (colon) operator
+- primitive code: native code fragments that are executed directly by the CPU
+- colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
 
 Every defined word has a `code` field that points to native code.  In the case
 of "code" words, the `code` field points to a routine that performs the
@@ -458,59 +476,57 @@ operation.  In the case of a colon definition, the `code` field points to the
 `doColon()` function, which saves the current program state and then starts
 executing the words that make up the colon definition.
 
-Each of our code words ends with a call to the `next()` function, which sets
-everything up to execute the next instruction, whether that is the following
-instruction in the current colon definition, or the next instruction in a colon
-definition that called the current colon definition.
-
 Each colon definition ends with a call to `EXIT`, which sets up a return to the
 colon definition that called the current word.
 
     
     void processInstructions() {
-        while (currentInstruction != nullptr) {
+        while (nextInstruction != nullptr) {
+            currentInstruction = nextInstruction++;
             currentInstruction->code();
         }
         throw std::runtime_error("No instructions to process");
     }
     
-    void next() {
-        currentInstruction = nextInstruction++;
-    }
-    
     void doColon() {
+        REQUIRE_RSTACK_AVAILABLE(1, "(colon)");
         rpush(CELL(nextInstruction));
         nextInstruction = reinterpret_cast<Definition*>(currentInstruction->parameter);
     }
     
     // EXIT ( -- ) ( R: nest-sys -- )
     void exit() {
+        REQUIRE_RSTACK_DEPTH(1, "EXIT");
         nextInstruction = reinterpret_cast<Definition*>(*rTop);
         rpop();
-        next();
     }
     
-    // LIT ( -- x )
+    // (literal) ( -- x )
     // Compiled by LITERAL.
     // Not an ANS Forth word.
-    void lit() {
+    void doLiteral() {
+        REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
         push(CELL(nextInstruction));
         ++nextInstruction;
-        next();
     }
     
 
-Next we'll define the basic Forth stack manipulation words.  Where possible, we
-don't change the stack depth any more than necessary.  For example, `SWAP` and
-`DROP` just rearrange elements on the stack, rather than doing any popping or
-pushing.
+Next we'll define the basic Forth stack manipulation words.  When changing the
+stack, we don't change the stack depth any more than necessary.  For example,
+`SWAP` and `DROP` just rearrange elements on the stack, rather than doing any
+popping or pushing.
 
+    
+    // DEPTH ( -- +n )
+    void depth() {
+        REQUIRE_DSTACK_AVAILABLE(1, "DEPTH");
+        push(static_cast<Cell>(dStackDepth()));
+    }
     
     // DROP ( x -- )
     void drop() {
         REQUIRE_DSTACK_DEPTH(1, "DROP");
         pop();
-        next();
     }
     
     // DUP ( x -- x x )
@@ -518,7 +534,6 @@ pushing.
         REQUIRE_DSTACK_DEPTH(1, "DUP");
         REQUIRE_DSTACK_AVAILABLE(1, "DUP");
         push(*dTop);
-        next();
     }
     
     // OVER ( x1 x2 -- x1 x2 x1 )
@@ -526,7 +541,6 @@ pushing.
         REQUIRE_DSTACK_DEPTH(2, "OVER");
         REQUIRE_DSTACK_AVAILABLE(1, "OVER");
         push(*(dTop - 1));
-        next();
     }
     
     // SWAP ( x1 x2 -- x2 x1 )
@@ -535,7 +549,6 @@ pushing.
         auto temp = *dTop;
         *dTop = *(dTop - 1);
         *(dTop - 1) = temp;
-        next();
     }
     
     // ROT ( x1 x2 x3 -- x2 x3 x1 )
@@ -547,7 +560,6 @@ pushing.
         *dTop = x1;
         *(dTop - 1) = x3;
         *(dTop - 2) = x2;
-        next();
     }
     
     // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
@@ -556,7 +568,6 @@ pushing.
         auto index = *dTop;
         REQUIRE_DSTACK_DEPTH(index + 2, "PICK");
         *dTop = *(dTop - index - 1);
-        next();
     }
     
     // ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
@@ -570,7 +581,6 @@ pushing.
             std::memmove(dTop - index - 1, dTop - index, index * sizeof(Cell));
             *dTop = x;
         }
-        next();
     }
     
     // ?DUP ( x -- 0 | x x )
@@ -581,7 +591,6 @@ pushing.
             REQUIRE_DSTACK_AVAILABLE(1, "?DUP");
             push(top);
         }
-        next();
     }
     
     // >R ( x -- ) ( R:  -- x )
@@ -590,7 +599,6 @@ pushing.
         REQUIRE_RSTACK_AVAILABLE(1, ">R");
         rpush(*dTop);
         pop();
-        next();
     }
     
     // R> ( -- x ) ( R: x -- )
@@ -599,7 +607,6 @@ pushing.
         REQUIRE_DSTACK_AVAILABLE(1, "R>");
         push(*rTop);
         rpop();
-        next();
     }
     
     // R@ ( -- x ) ( R: x -- x )
@@ -607,7 +614,6 @@ pushing.
         REQUIRE_RSTACK_DEPTH(1, "R@");
         REQUIRE_DSTACK_AVAILABLE(1, "R@");
         push(*rTop);
-        next();
     }
     
 
@@ -624,7 +630,6 @@ values in data space.
         auto x = *dTop;
         pop();
         *aaddr = x;
-        next();
     }
     
     // @ ( a-addr -- x )
@@ -633,7 +638,6 @@ values in data space.
         auto aaddr = AADDR(*dTop);
         REQUIRE_ALIGNED(aaddr, "@");
         *dTop = *aaddr;
-        next();
     }
     
     // c! ( char c-addr -- )
@@ -644,7 +648,6 @@ values in data space.
         auto x = *dTop;
         pop();
         *caddr = static_cast<Char>(x);
-        next();
     }
     
     // c@ ( c-addr -- char )
@@ -653,7 +656,6 @@ values in data space.
         auto caddr = CADDR(*dTop);
         REQUIRE_ALIGNED(caddr, "C@");
         *dTop = static_cast<Cell>(*caddr);
-        next();
     }
     
  
@@ -674,21 +676,18 @@ space pointer.
     // ALIGN ( -- )
     void align() {
         alignDataPointer();
-        next();
     }
     
     // ALIGNED ( addr -- a-addr )
     void aligned() {
         REQUIRE_DSTACK_DEPTH(1, "ALIGNED");
         *dTop = CELL(alignAddress(*dTop));
-        next();
     }
     
     // HERE ( -- addr )
     void here() {
         REQUIRE_DSTACK_AVAILABLE(1, "HERE");
         push(CELL(dataPointer));
-        next();
     }
     
     // ALLOT ( n -- )
@@ -698,21 +697,18 @@ space pointer.
         REQUIRE_DATASPACE_AVAILABLE(CellSize, "ALLOT");
         dataPointer += *dTop;
         pop();
-        next();
     }
     
     // CELL+ ( a-addr1 -- a-addr2 )
     void cellPlus() {
         REQUIRE_DSTACK_DEPTH(1, "CELL+");
         *dTop += CellSize;
-        next();
     }
     
     // CELLS ( n1 -- n2 )
     void cells() {
         REQUIRE_DSTACK_DEPTH(1, "CELLS");
         *dTop *= CellSize;
-        next();
     }
     
     // Store a cell to data space.
@@ -729,7 +725,6 @@ space pointer.
         REQUIRE_DSTACK_DEPTH(1, ",");
         data(*dTop);
         pop();
-        next();
     }
     
     // Store a char to data space.
@@ -738,7 +733,6 @@ space pointer.
         REQUIRE_DATASPACE_AVAILABLE(1, "C,");
         *dataPointer = static_cast<Char>(x);
         dataPointer += 1;
-        next();
     }
     
     // C, ( char -- )
@@ -746,11 +740,17 @@ space pointer.
         REQUIRE_DSTACK_DEPTH(1, "C,");
         cdata(*dTop);
         pop();
-        next();
+    }
+    
+    // UNUSED ( -- u )
+    void unused() {
+        REQUIRE_DSTACK_AVAILABLE(1, "UNUSED");
+        push(static_cast<Cell>(dataSpaceLimit - dataPointer));
     }
     
 
-Define I/O primitives.
+Here we will define our I/O primitives.  We keep things easy and portable by
+using C++ iostream objects.
 
     
     // EMIT ( x -- )
@@ -759,7 +759,31 @@ Define I/O primitives.
         auto cell = *dTop;
         pop();
         std::cout.put(static_cast<char>(cell));
-        next();
+    }
+    
+    // >IN ( -- a-addr )
+    void in() {
+        REQUIRE_DSTACK_AVAILABLE(1, ">IN");
+        push(CELL(&inputOffset));
+    }
+    
+    // SOURCE ( -- c-addr u )
+    void source() {
+        REQUIRE_DSTACK_AVAILABLE(2, "SOURCE");
+        push(CELL(inputBuffer.c_str()));
+        push(inputBuffer.length());
+    }
+    
+    // REFILL ( -- flag )
+    void refill() {
+        REQUIRE_DSTACK_AVAILABLE(1, "REFILL");
+        if (std::getline(std::cin, inputBuffer)) {
+            inputOffset = 0;
+            push(True);
+        }
+        else {
+            push(False);
+        }
     }
     
 
@@ -773,7 +797,6 @@ Define arithmetic primitives.
         pop();
         auto n1 = static_cast<SCell>(*dTop);
         *dTop = static_cast<Cell>(n1 + n2);
-        next();
     }
     
     // - ( n1 n2 -- n3 )
@@ -783,7 +806,6 @@ Define arithmetic primitives.
         pop();
         auto n1 = static_cast<SCell>(*dTop);
         *dTop = static_cast<Cell>(n1 - n2);
-        next();
     }
     
     // * ( n1 n2 -- n3 )
@@ -793,7 +815,6 @@ Define arithmetic primitives.
         pop();
         auto n1 = static_cast<SCell>(*dTop);
         *dTop = static_cast<Cell>(n1 * n2);
-        next();
     }
     
     // / ( n1 n2 -- n3 )
@@ -804,7 +825,6 @@ Define arithmetic primitives.
         auto n1 = static_cast<SCell>(*dTop);
         RUNTIME_ERROR_IF(n2 == 0, "/: zero divisor");
         *dTop = static_cast<Cell>(n1 / n2);
-        next();
     }
     
     // /MOD ( n1 n2 -- n3 n4 )
@@ -816,14 +836,12 @@ Define arithmetic primitives.
         auto result = std::ldiv(n1, n2);
         *(dTop - 1) = static_cast<Cell>(result.rem);
         *dTop = static_cast<Cell>(result.quot);
-        next();
     }
     
     // NEGATE ( n1 -- n2 )
     void negate() {
         REQUIRE_DSTACK_DEPTH(1, "NEGATE");
         *dTop = static_cast<Cell>(-static_cast<SCell>(*dTop));
-        next();
     }
     
 
@@ -836,7 +854,6 @@ Define logical and relational primitives.
         auto x2 = *dTop;
         pop();
         *dTop = *dTop & x2;
-        next();
     }
     
     // OR ( x1 x2 -- x3 )
@@ -845,7 +862,6 @@ Define logical and relational primitives.
         auto x2 = *dTop;
         pop();
         *dTop = *dTop | x2;
-        next();
     }
     
     // XOR ( x1 x2 -- x3 )
@@ -854,14 +870,12 @@ Define logical and relational primitives.
         auto x2 = *dTop;
         pop();
         *dTop = *dTop ^ x2;
-        next();
     }
     
     // INVERT ( x1 -- x2 )
     void invert() {
         REQUIRE_DSTACK_DEPTH(1, "INVERT");
         *dTop = ~*dTop;
-        next();
     }
     
     // LSHIFT ( x1 u -- x2 )
@@ -870,7 +884,6 @@ Define logical and relational primitives.
         auto n = *dTop;
         pop();
         *dTop <<= n;
-        next();
     }
     
     // RSHIFT ( x1 u -- x2 )
@@ -879,7 +892,6 @@ Define logical and relational primitives.
         auto n = *dTop;
         pop();
         *dTop >>= n;
-        next();
     }
     
     // = ( x1 x2 -- flag )
@@ -888,7 +900,6 @@ Define logical and relational primitives.
         auto n2 = *dTop;
         pop();
         *dTop = *dTop == n2 ? True : False;
-        next();
     }
     
     // < ( n1 n2 -- flag )
@@ -897,7 +908,6 @@ Define logical and relational primitives.
         auto n2 = static_cast<SCell>(*dTop);
         pop();
         *dTop = static_cast<SCell>(*dTop) < n2 ? True : False;
-        next();
     }
     
     // > ( n1 n2 -- flag )
@@ -906,7 +916,6 @@ Define logical and relational primitives.
         auto n2 = static_cast<SCell>(*dTop);
         pop();
         *dTop = static_cast<SCell>(*dTop) > n2 ? True : False;
-        next();
     }
     
 
@@ -919,7 +928,6 @@ Define system and environmental primitives
     void argCount() {
         REQUIRE_DSTACK_AVAILABLE(1, "#ARG");
         push(commandLineArgCount);
-        next();
     }
     
     // ARG ( n -- c-addr u )
@@ -933,7 +941,6 @@ Define system and environmental primitives
         auto value = commandLineArgVector[index];
         *dTop = CELL(value);
         push(std::strlen(value));
-        next();
     }
     
     // BYE ( -- )
@@ -950,7 +957,6 @@ Compilation
     void state() {
         REQUIRE_DSTACK_AVAILABLE(1, "STATE");
         push(CELL(&isCompiling));
-        next();
     }
     
     void defineCodeWord(const char* name, Code code) {
@@ -1001,7 +1007,6 @@ Compilation
             *dTop = CELL(word);
             push(word->isImmediate() ? 1 : Cell(-1));
         }
-        next();
     }
     
     // WORDS ( -- )
@@ -1009,7 +1014,72 @@ Compilation
         for (auto word = latestDefinition; word >= dictionary; ++word) {
             std::cout << word->name << " ";
         }
-        next();
+    }
+    
+
+In `initializeDictionary()`, we set up the initial contents of the dictionary.
+This is the Forth kernel that Forth code can use to implement the rest of a
+working system.
+
+    
+    void definePrimitives() {
+        static struct { const char* name; Code code; } codeWords[] = {
+            {"!",           store},
+            {"#ARG",        argCount},
+            {"(literal)",   doLiteral},
+            {"*",           star},
+            {"+",           plus},
+            {",",           comma},
+            {"-",           minus},
+            {"/",           slash},
+            {"/MOD",        slashMod},
+            {"<",           lessThan},
+            {"=",           equals},
+            {">",           greaterThan},
+            {">IN",         in},
+            {">R",          toR},
+            {"?DUP",        qdup},
+            {"@",           fetch},
+            {"ALIGN",       align},
+            {"ALIGNED",     aligned},
+            {"ALLOT",       allot},
+            {"AND",         bitwiseAnd},
+            {"ARG",         argAtIndex},
+            {"BYE",         bye},
+            {"C!",          cstore},
+            {"C,",          ccomma},
+            {"C@",          cfetch},
+            {"CELL+",       cellPlus},
+            {"CELLS",       cells},
+            {"DEPTH",       depth},
+            {"DROP",        drop},
+            {"DUP",         dup},
+            {"EMIT",        emit},
+            {"EXIT",        exit},
+            {"FIND",        find},
+            {"HERE",        here},
+            {"INVERT",      invert},
+            {"LSHIFT",      lshift},
+            {"NEGATE",      negate},
+            {"OR",          bitwiseOr},
+            {"OVER",        over},
+            {"PICK",        pick},
+            {"R>",          rFrom},
+            {"R@",          rFetch},
+            {"REFILL",      refill},
+            {"ROLL",        roll},
+            {"ROT",         rot},
+            {"RSHIFT",      rshift},
+            {"SOURCE",      source},
+            {"STATE",       state},
+            {"SWAP",        swap},
+            {"UNUSED",      unused},
+            {"WORDS",       words},
+            {"XOR",         bitwiseXor}
+        };
+        for (auto& w: codeWords) {
+            defineCodeWord(w.name, w.code);
+        }
     }
     
     void initializeDictionary() {
@@ -1018,57 +1088,7 @@ Compilation
             word->reset();
         }
     
-        static struct { const char* name; Code code; } codeWords[] = {
-            {"!",       store},
-            {"#ARG",    argCount},
-            {"*",       star},
-            {"+",       plus},
-            {",",       comma},
-            {"-",       minus},
-            {"/",       slash},
-            {"/MOD",    slashMod},
-            {"<",       lessThan},
-            {"=",       equals},
-            {">",       greaterThan},
-            {">R",      toR},
-            {"?DUP",    qdup},
-            {"@",       fetch},
-            {"ALIGN",   align},
-            {"ALIGNED", aligned},
-            {"ALLOT",   allot},
-            {"AND",     bitwiseAnd},
-            {"ARG",     argAtIndex},
-            {"BYE",     bye},
-            {"C!",      cstore},
-            {"C,",      ccomma},
-            {"C@",      cfetch},
-            {"CELL+",   cellPlus},
-            {"CELLS",   cells},
-            {"DROP",    drop},
-            {"DUP",     dup},
-            {"EMIT",    emit},
-            {"EXIT",    exit},
-            {"FIND",    find},
-            {"HERE",    here},
-            {"INVERT",  invert},
-            {"LSHIFT",  lshift},
-            {"NEGATE",  negate},
-            {"OR",      bitwiseOr},
-            {"OVER",    over},
-            {"PICK",    pick},
-            {"R>",      rFrom},
-            {"R@",      rFetch},
-            {"ROLL",    roll},
-            {"ROT",     rot},
-            {"RSHIFT",  rshift},
-            {"STATE",   state},
-            {"SWAP",    swap},
-            {"WORDS",   words},
-            {"XOR",     bitwiseXor}
-        };
-        for (auto& w: codeWords) {
-            defineCodeWord(w.name, w.code);
-        }
+        definePrimitives();
     }
     
     } // end anonymous namespace
@@ -1091,7 +1111,11 @@ Compilation
         try {
             commandLineArgCount = static_cast<size_t>(argc);
             commandLineArgVector = argv;
+    
             resetForth();
+    
+            processInstructions();
+    
             return 0;
         }
         catch (const std::exception& ex) {
