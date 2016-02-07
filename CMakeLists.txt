@@ -4,6 +4,13 @@ project(cxxforth)
 add_executable(cxxforth cxxforth.cpp)
 add_executable(cpp2md   cpp2md.cpp)
 
+add_custom_target(cxxforth.cpp.md ALL build/cpp2md cxxforth.cpp cxxforth.cpp.md
+  DEPENDS cxxforth.cpp cpp2md
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Generate cxxforth.cpp.md" VERBATIM
+  SOURCES cxxforth.cpp
+)
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "-m32 -O3 -std=c++14 -Weverything -Wno-c++98-compat -Wno-unused-parameter -Wno-global-constructors -Wno-exit-time-destructors -Wno-unused-function -Wno-unused-const-variable -Wno-unused-macros -Wno-unused-member-function -Wno-unused-variable -Wno-padded -Wno-missing-noreturn -Wno-array-bounds-pointer-arithmetic")
     set(CMAKE_EXE_LINKER_FLAGS "-m32")
