@@ -6,30 +6,6 @@ by Kristopher Johnson
 
 ----
 
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
-software, either in source code form or as a compiled binary, for any purpose,
-commercial or non-commercial, and by any means.
-
-In jurisdictions that recognize copyright laws, the author or authors of this
-software dedicate any and all copyright interest in the software to the public
-domain. We make this dedication for the benefit of the public at large and to
-the detriment of our heirs and successors. We intend this dedication to be an
-overt act of relinquishment in perpetuity of all present and future rights to
-this software under copyright law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org/>
-
-----
-
 `cxxforth` is a simple implementation of a [Forth][forth] system in C++.  There
 are many examples of Forth implementations available on the Internet, but most
 of them are written in assembly language or low-level C, with a focus in
@@ -84,6 +60,30 @@ implemented.
 
 ----
 
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+----
+
 Building cxxforth
 -----------------
 
@@ -126,6 +126,7 @@ the `cxxforthconfig.h` file produced by the CMake build.
     #include <cstdlib>
     #include <cstring>
     #include <ctime>
+    #include <iomanip>
     #include <iostream>
     #include <stdexcept>
     #include <string>
@@ -324,6 +325,13 @@ We need a flag to track whether we are in interpreting or compiling state
 
     
     Cell isCompiling = True;
+    
+
+We provide a variable that controls the numeric base used for conversion
+between numbers and text.  This corresponds to the Forth `BASE` variable.
+
+    
+    Cell numericBase = 10;
     
 
 The input buffer is a `std::string`.  This makes it easy to use the C++ I/O
@@ -750,6 +758,19 @@ using C++ iostream objects.
         std::cout << std::endl;
     }
     
+    // . ( n -- )
+    void dot() {
+        REQUIRE_DSTACK_DEPTH(1, ".");
+        std::cout << std::setbase(static_cast<int>(numericBase)) << *dTop << " ";
+        pop();
+    }
+    
+    // BASE ( -- a-addr )
+    void base() {
+        REQUIRE_DSTACK_AVAILABLE(1, "BASE");
+        push(CELL(&numericBase));
+    }
+    
     // SOURCE ( -- c-addr u )
     void source() {
         REQUIRE_DSTACK_AVAILABLE(2, "SOURCE");
@@ -975,11 +996,10 @@ Define system and environmental primitives
     
     // .S ( -- )
     void dotS() {
-        // TODO: Use Forth formatted output
         auto depth = dStackDepth();
-        std::cout << "<" << depth << "> ";
-        for (auto i = depth; i > 0; ++i) {
-            std::cout << *(dTop - i + 1) << " ";
+        std::cout << std::setbase(static_cast<int>(numericBase)) << "<" << depth << "> ";
+        for (auto i = depth; i > 0; --i) {
+            std::cout << static_cast<SCell>(*(dTop - i + 1)) << " ";
         }
     }
     
@@ -1029,6 +1049,9 @@ Compilation
     }
     
     Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
+        if (nameLength == 0)
+            return nullptr;
+    
         for (auto defn = latestDefinition; defn >= dictionary; --defn) {
             if (defn->isHidden())
                 continue;
@@ -1066,7 +1089,7 @@ Compilation
     
     // WORDS ( -- )
     void words() {
-        for (auto word = latestDefinition; word >= dictionary; ++word) {
+        for (auto word = latestDefinition; word >= dictionary; --word) {
             std::cout << word->name << " ";
         }
     }
@@ -1125,6 +1148,10 @@ colon definition that called the current word.
 Outer Interpreter
 -----------------
 
+See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description of the Forth text interpreter.
+
+[dpans_3_4]: http://forth.sourceforge.net/std/dpans/dpans3.htm#3.4 "3.4 The Forth text interpreter"
+
     
     // WORD ( char "<chars>ccc<char>" -- c-addr ) 
     void word() {
@@ -1149,10 +1176,120 @@ Outer Interpreter
         // Update the count at the beginning of the string.
         wordBuffer[0] = static_cast<char>(wordBuffer.size() - 1);
     
-        // ANS Forth standard says a space is required at the end.
+        // ANS Forth standard says a space character is required after the data.
         wordBuffer.push_back(' ');
     
         *dTop = CELL(wordBuffer.data());
+    }
+    
+    // BL ( -- char )
+    void bl() {
+        REQUIRE_DSTACK_AVAILABLE(1, "BL");
+        push(' ');
+    }
+    
+    // Determine whether specified character is a valid numeric digit for current BASE.
+    bool isValidDigit(Char c) {
+        if (numericBase > 10) {
+            if (('A' <= c) && (c < ('A' + numericBase - 10)))
+                return true;
+            if (('a' <= c) && (c < ('a' + numericBase - 10)))
+                return true;
+        }
+        return ('0' <= c) && (c < ('0' + numericBase));
+    }
+    
+    Cell digitValue(Char c) {
+        if (c >= 'a')
+            return c - 'a' + 10;
+        else if (c >= 'A')
+            return c - 'A' + 10;
+        else 
+            return c - '0';
+    }
+    
+    // PARSE-NUMBER ( u0 c-addr1 u1 -- u c-addr2 u2 )
+    // Not an ANS Forth word.
+    // This word is similar to ANS Forth's >NUMBER, but provides a single-cell result.
+    void parseNumber() {
+        REQUIRE_DSTACK_DEPTH(3, "PARSE-NUMBER");
+        
+        auto length = static_cast<std::size_t>(*dTop);
+        auto caddr = CADDR(*(dTop - 1));
+        auto value = *(dTop - 2);
+    
+        auto i = std::size_t(0);
+        while (i < length) {
+            auto c = caddr[i];
+            if (isValidDigit(c)) {
+                auto n = digitValue(c);
+                value = value * numericBase + n;
+                ++i;
+            }
+            else {
+                break;
+            }
+        }
+        
+        *(dTop - 2) = value;
+        *(dTop - 1) = CELL(caddr + i);
+        *dTop = length - i;
+    }
+    
+    // INTERPRET ( i*x -- j*x )
+    // Not an ANS Forth word.
+    // Reads words from the input buffer and executes/compiles them.
+    void interpret() {
+        auto inputSize = inputBuffer.size();
+        while (inputOffset < inputSize) {
+            bl(); word(); find();
+    
+            auto found = static_cast<int>(*dTop);
+            pop();  
+            
+            if (found) {
+                // TODO: If compiling, compile.
+                auto xt = reinterpret_cast<Definition*>(*dTop);
+                pop();
+                xt->execute();
+            }
+            else {
+                // find() left the counted string on the stack.
+                // Try to parse it as a number.
+    
+                count();
+                auto length = static_cast<std::size_t>(*dTop);
+                pop();
+                auto caddr = CADDR(*dTop);
+                pop(); 
+    
+                if (length > 0) {
+                    if (isValidDigit(*caddr)) {
+                        push(0);
+                        push(CELL(caddr));
+                        push(length);
+                        parseNumber();
+    
+                        auto remainingLength = static_cast<std::size_t>(*dTop);
+                        pop();
+                        pop();
+                        if (remainingLength == 0) {
+                            // OK, the number is on the top of the stack.
+                        }
+                        else {
+                            throw std::runtime_error(std::string("unable to parse number: ") + wordBuffer);
+                        }
+                    }
+                    else {
+                        throw std::runtime_error(std::string("unrecognized word: ") + wordBuffer);
+                    }
+                }
+                else {
+                    pop();
+                    return;
+                }
+            }
+        }
     }
     
     // PROMPT ( -- )
@@ -1170,47 +1307,23 @@ Outer Interpreter
         }
     }
     
-    // BL ( -- char )
-    void bl() {
-        REQUIRE_DSTACK_AVAILABLE(1, "BL");
-        push(' ');
-    }
-    
-    // INTERPRET ( i*x -- j*x )
-    // Not an ANS Forth word.
-    // Reads words from the input buffer and executes/compiles them.
-    void interpret() {
-        auto inputSize = inputBuffer.size();
-        while (inputOffset < inputSize) {
-            bl(); word(); count();
-            auto length = *dTop;
-            auto caddr = *(dTop - 1);
-            if (length == 0) {
-                pop();
-                pop();
-                return;
-            }
-            // TODO: Interpret the word we've just parsed.  For now, just echo them to output.
-            type();
-            cr();
-        }
-    }
-    
     // QUIT ( -- )
     //
     // TODO: Replace this code primitive with this Forth implementation:
     //
-    //   : QUIT  ]  BEGIN REFILL WHILE INTERPRET PROMPT REPEAT  BYE ;
+    //   : QUIT  ]  BEGIN REFILL WHILE INTERPRET PROMPT REPEAT  CR BYE ;
     //
     void quit() {
-        // TODO: Use setjmp/longjmp to reset CPU return stack
-        isCompiling = False;
+        // TODO: Use setjmp/longjmp to unnest return stack.
+    
+        leftBracket();
         for (;;) {
             refill();
-            auto successFlag = *dTop;
+            auto refillSuccess = *dTop;
             pop();
-            if (!successFlag)
+            if (!refillSuccess)
                 break;
+    
             interpret();
             prompt();
         }
@@ -1245,6 +1358,7 @@ working system.
             {"*",             star},
             {"+",             plus},
             {"-",             minus},
+            {".",             dot},
             {".S",            dotS},
             {"/",             slash},
             {"/MOD",          slashMod},
@@ -1260,6 +1374,7 @@ working system.
             {"ALLOT",         allot},
             {"AND",           bitwiseAnd},
             {"ARG",           argAtIndex},
+            {"BASE",          base},
             {"BL",            bl},
             {"BYE",           bye},
             {"C!",            cstore},
@@ -1284,6 +1399,7 @@ working system.
             {"NEGATE",        negate},
             {"OR",            bitwiseOr},
             {"OVER",          over},
+            {"PARSE-NUMBER",  parseNumber},
             {"PICK",          pick},
             {"PROMPT",        prompt},
             {"QUIT",          quit},
@@ -1358,13 +1474,19 @@ working system.
     }
     
     #ifndef CXXFORTH_NO_MAIN
+    
     int main(int argc, const char** argv) {
+        // Print credits and help message if no arguments.
         if (argc == 1) {
-            std::cout << "cxxforth " << cxxforthVersion << " <https://bitbucket.org/KristopherJohnson/cxxforth>" << std::endl
+            std::cout << "cxxforth "
+                      << cxxforthVersion
+                      << " <https://bitbucket.org/KristopherJohnson/cxxforth>\n"
                       << "Type \"bye\" to exit." << std::endl;
         }
+    
         return cxxforthRun(argc, argv);
     }
-    #endif
+    
+    #endif // CXXFORTH_NO_MAIN
     
     
