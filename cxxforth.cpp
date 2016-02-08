@@ -251,6 +251,10 @@ struct Definition {
     static constexpr Cell FlagHidden    = (1 << 1);
     static constexpr Cell FlagImmediate = (1 << 2);
 
+    void execute() const {
+        code();
+    }
+
     const char* nameAddress() const {
         return name.data();
     }
@@ -330,21 +334,42 @@ Definition* latestDefinition = nullptr;
 
 /****
 
-Our interpreter needs to keep track of the word that is currently being
-executed, and the next instruction to be executed when it is finished.
-
-We also need a flag to track whether we are in interpreting or compiling state
+We need a flag to track whether we are in interpreting or compiling state
 (corresponding to Forth's `STATE` variable).
 
 ****/
 
-Definition* currentInstruction = nullptr;
-Definition* nextInstruction    = nullptr;
-
 Cell isCompiling = True;
+
+/****
+
+The input buffer is a `std::string`.  This makes it easy to use the C++ I/O
+facilities, and frees us from the need to allocate a statically sized buffer
+that could overflow.  We also have a current offset into this buffer,
+corresponding to the Forth `>IN` variable.
+
+****/
 
 std::string inputBuffer;
 Cell inputOffset = 0;
+
+/****
+
+We need a buffer to store the result of the Forth `WORD` word.  As with the
+input buffer, we use a `std::string` so we don't need to worry about memory
+management.
+
+****/
+
+std::string wordBuffer;
+
+/****
+
+We store the `argc` and `argv` values passed to `main()`, for use by the Forth
+program.  These are made available by our non-standard `#ARG` and `ARG` Forth
+words.
+
+****/
 
 size_t commandLineArgCount = 0;
 const char** commandLineArgVector = nullptr;
@@ -458,6 +483,10 @@ our code, we'll define a few simple functions to handle those operations.  We
 can expect the compiler to expand calls to these functions inline, so we aren't
 losing any efficiency.
 
+We will use the expressions `*dTop` and `*rTop` when accessing the top-of-stack
+values without pushing/popping.  We will also use expressions like `*(dTop -
+1)` and `*(dTop - 2)` to reference the items beneath the top of stack.
+
 ****/
 
 // Push cell onto data stack.
@@ -482,65 +511,15 @@ void rpop() {
 
 /****
 
-Interpreter
------------
-
-Now we get to some of the most important operations in a Forth system.  They
-look very simple, but these functions are going to implement the interpreter
-that executes compiled Forth definitions.
-
-There are basically two kinds of words in a Forth system:
-
-- primitive code: native code fragments that are executed directly by the CPU
-- colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
-
-Every defined word has a `code` field that points to native code.  In the case
-of "code" words, the `code` field points to a routine that performs the
-operation.  In the case of a colon definition, the `code` field points to the
-`doColon()` function, which saves the current program state and then starts
-executing the words that make up the colon definition.
-
-Each colon definition ends with a call to `EXIT`, which sets up a return to the
-colon definition that called the current word.
-
-****/
-
-void processInstructions() {
-    while (nextInstruction != nullptr) {
-        currentInstruction = nextInstruction++;
-        currentInstruction->code();
-    }
-    throw std::runtime_error("No instructions to process");
-}
-
-void doColon() {
-    REQUIRE_RSTACK_AVAILABLE(1, "(colon)");
-    rpush(CELL(nextInstruction));
-    nextInstruction = reinterpret_cast<Definition*>(currentInstruction->parameter);
-}
-
-// EXIT ( -- ) ( R: nest-sys -- )
-void exit() {
-    REQUIRE_RSTACK_DEPTH(1, "EXIT");
-    nextInstruction = reinterpret_cast<Definition*>(*rTop);
-    rpop();
-}
-
-// (literal) ( -- x )
-// Compiled by LITERAL.
-// Not an ANS Forth word.
-void doLiteral() {
-    REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
-    push(CELL(nextInstruction));
-    ++nextInstruction;
-}
-
-/****
-
 Next we'll define the basic Forth stack manipulation words.  When changing the
 stack, we don't change the stack depth any more than necessary.  For example,
 `SWAP` and `DROP` just rearrange elements on the stack, rather than doing any
 popping or pushing.
+
+Note that for C++ functions that implement primitive Forth words, we will
+include the Forth names and stack effects in comments. You can look up the
+Forth names in the [ANS Forth draft standard][dpans] to learn what these words
+are supposed to do.
 
 ****/
 
@@ -687,6 +666,16 @@ void cfetch() {
     *dTop = static_cast<Cell>(*caddr);
 }
 
+// COUNT ( c-addr1 -- c-addr2 u )
+void count() {
+    REQUIRE_DSTACK_DEPTH(1, "COUNT");
+    REQUIRE_DSTACK_AVAILABLE(1, "COUNT");
+    auto caddr = CADDR(*dTop);
+    auto count = static_cast<Cell>(*caddr);
+    *dTop = CELL(caddr + 1);
+    push(count);
+}
+
 /****
  
 Now we will define the Forth words for accessing and manipulating the data
@@ -780,10 +769,19 @@ void emit() {
     std::cout.put(static_cast<char>(cell));
 }
 
-// >IN ( -- a-addr )
-void in() {
-    REQUIRE_DSTACK_AVAILABLE(1, ">IN");
-    push(CELL(&inputOffset));
+// TYPE ( c-addr u -- )
+void type() {
+    REQUIRE_DSTACK_DEPTH(2, "TYPE");
+    auto length = static_cast<std::streamsize>(*dTop);
+    pop();
+    auto caddr = reinterpret_cast<char*>(*dTop);
+    pop();
+    std::cout.write(caddr, length);
+}
+
+// CR ( -- )
+void cr() {
+    std::cout << std::endl;
 }
 
 // SOURCE ( -- c-addr u )
@@ -791,6 +789,12 @@ void source() {
     REQUIRE_DSTACK_AVAILABLE(2, "SOURCE");
     push(CELL(inputBuffer.data()));
     push(inputBuffer.length());
+}
+
+// >IN ( -- a-addr )
+void in() {
+    REQUIRE_DSTACK_AVAILABLE(1, ">IN");
+    push(CELL(&inputOffset));
 }
 
 // REFILL ( -- flag )
@@ -1009,6 +1013,16 @@ void utcTimeAndDate () {
     push(static_cast<Cell>(tm->tm_year + 1900));
 }
 
+// .S ( -- )
+void dotS() {
+    // TODO: Use Forth formatted output
+    auto depth = dStackDepth();
+    std::cout << "<" << depth << "> ";
+    for (auto i = depth; i > 0; ++i) {
+        std::cout << *(dTop - i + 1) << " ";
+    }
+}
+
 /**** 
  
 Compilation
@@ -1020,6 +1034,22 @@ Compilation
 void state() {
     REQUIRE_DSTACK_AVAILABLE(1, "STATE");
     push(CELL(&isCompiling));
+}
+
+// [ ( -- )
+void leftBracket() {
+    isCompiling = False;
+}
+
+// ] ( -- )
+void rightBracket() {
+    isCompiling = True;
+}
+
+// IMMEDIATE ( -- )
+void immediate() {
+    RUNTIME_ERROR_IF(latestDefinition < dictionary, "IMMEDIATE: no latest definition");
+    latestDefinition->setImmediate(true);
 }
 
 void defineCodeWord(const char* name, Code code) {
@@ -1041,7 +1071,7 @@ bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
 }
 
 Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
-    for (auto defn = latestDefinition; defn >= dictionary; ++defn) {
+    for (auto defn = latestDefinition; defn >= dictionary; --defn) {
         if (defn->isHidden())
             continue;
         auto& name = defn->name;
@@ -1053,6 +1083,10 @@ Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
         }
     }
     return nullptr;
+}
+
+Definition* findDefinition(const std::string& name) {
+    return findDefinition(CADDR(const_cast<char*>(name.data())), static_cast<Cell>(name.length()));
 }
 
 // FIND ( c-addr -- c-addr 0  |  xt 1  |  xt -1 )
@@ -1081,6 +1115,160 @@ void words() {
 
 /****
 
+Inner Interpreter
+-----------------
+
+A Forth system is said to have two interpreters: an "outer interpreter" which
+reads input and interprets it, and an "inner interpreter" which executes
+compiled Forth definitions.  We'll start with the inner interpreter.
+
+There are basically two kinds of words in a Forth system:
+
+- primitive code: native code fragments that are executed directly by the CPU
+- colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
+
+Every defined word has a `code` field that points to native code.  In the case
+of "code" words, the `code` field points to a routine that performs the
+operation.  In the case of a colon definition, the `code` field points to the
+`doColon()` function, which saves the current program state and then starts
+executing the words that make up the colon definition.
+
+Each colon definition ends with a call to `EXIT`, which sets up a return to the
+colon definition that called the current word.
+
+****/
+
+void doColon() {
+    // TODO
+    throw std::runtime_error("doColon not implemented");
+}
+
+// EXIT ( -- ) ( R: nest-sys -- )
+void exit() {
+    // TODO
+    throw std::runtime_error("EXIT not implemented");
+}
+
+// (literal) ( -- x )
+// Compiled by LITERAL.
+// Not an ANS Forth word.
+void doLiteral() {
+    REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
+    throw std::runtime_error("(literal) not implemented");
+}
+
+// EXECUTE ( i*x xt -- j*x )
+void execute() {
+    REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
+    auto word = reinterpret_cast<Definition*>(*dTop);
+    pop();
+    word->execute();
+}
+
+/****
+
+Outer Interpreter
+-----------------
+
+****/
+
+// WORD ( char "<chars>ccc<char>" -- c-addr ) 
+void word() {
+    REQUIRE_DSTACK_DEPTH(1, "WORD");
+    auto delim = static_cast<char>(*dTop);
+    
+    wordBuffer.clear();
+    wordBuffer.push_back(0);  // First char of buffer is length.
+
+    auto inputSize = inputBuffer.size();
+
+    // Skip leading delimiters
+    while (inputOffset < inputSize && inputBuffer[inputOffset] == delim)
+        ++inputOffset;
+
+    // Copy characters until we see the delimiter again.
+    while (inputOffset < inputSize && inputBuffer[inputOffset] != delim) {
+        wordBuffer.push_back(inputBuffer[inputOffset]);
+        ++inputOffset;
+    }
+
+    // Update the count at the beginning of the string.
+    wordBuffer[0] = static_cast<char>(wordBuffer.size() - 1);
+
+    // ANS Forth standard says a space is required at the end.
+    wordBuffer.push_back(' ');
+
+    *dTop = CELL(wordBuffer.data());
+}
+
+// PROMPT ( -- )
+// Not an ANS Forth word.
+// Displays "ok" prompt if in interpretation mode.
+//
+// TODO: Replace this code primitive with this Forth implementation:
+//
+//   : PROMPT  STATE @ IF ."  OK" CR THEN ;
+//
+void prompt() {
+    if (!isCompiling) {
+        std::cout << " ok";
+        cr();
+    }
+}
+
+// BL ( -- char )
+void bl() {
+    REQUIRE_DSTACK_AVAILABLE(1, "BL");
+    push(' ');
+}
+
+// INTERPRET ( i*x -- j*x )
+// Not an ANS Forth word.
+// Reads words from the input buffer and executes/compiles them.
+void interpret() {
+    auto inputSize = inputBuffer.size();
+    while (inputOffset < inputSize) {
+        bl(); word(); count();
+        auto length = *dTop;
+        auto caddr = *(dTop - 1);
+        if (length == 0) {
+            pop();
+            pop();
+            return;
+        }
+        // TODO: Interpret the word we've just parsed.  For now, just echo them to output.
+        type();
+        cr();
+    }
+}
+
+// QUIT ( -- )
+//
+// TODO: Replace this code primitive with this Forth implementation:
+//
+//   : QUIT  ]  BEGIN REFILL WHILE INTERPRET PROMPT REPEAT  BYE ;
+//
+void quit() {
+    // TODO: Use setjmp/longjmp to reset CPU return stack
+    isCompiling = False;
+    for (;;) {
+        refill();
+        auto successFlag = *dTop;
+        pop();
+        if (!successFlag)
+            break;
+        interpret();
+        prompt();
+    }
+    cr();
+    bye();
+}
+
+/****
+
+Initialization
+--------------
+
 In `initializeDictionary()`, we set up the initial contents of the dictionary.
 This is the Forth kernel that Forth code can use to implement the rest of a
 working system.
@@ -1088,6 +1276,16 @@ working system.
 ****/
 
 void definePrimitives() {
+    // Immediate words
+    static struct { const char* name; Code code; } immediateWords[] = {
+        {"[",             leftBracket}
+    };
+    for (auto& w: immediateWords) {
+        defineCodeWord(w.name, w.code);
+        immediate();
+    }
+
+    // Non-immediate words
     static struct { const char* name; Code code; } codeWords[] = {
         {"!",             store},
         {"#ARG",          argCount},
@@ -1095,6 +1293,7 @@ void definePrimitives() {
         {"*",             star},
         {"+",             plus},
         {"-",             minus},
+        {".S",            dotS},
         {"/",             slash},
         {"/MOD",          slashMod},
         {"<",             lessThan},
@@ -1109,18 +1308,24 @@ void definePrimitives() {
         {"ALLOT",         allot},
         {"AND",           bitwiseAnd},
         {"ARG",           argAtIndex},
+        {"BL",            bl},
         {"BYE",           bye},
         {"C!",            cstore},
         {"C@",            cfetch},
         {"CELL+",         cellPlus},
         {"CELLS",         cells},
+        {"COUNT",         count},
+        {"CR",            cr},
         {"DEPTH",         depth},
         {"DROP",          drop},
         {"DUP",           dup},
         {"EMIT",          emit},
+        {"EXECUTE",       execute},
         {"EXIT",          exit},
         {"FIND",          find},
         {"HERE",          here},
+        {"IMMEDIATE",     immediate},
+        {"INTERPRET",     interpret},
         {"INVERT",        invert},
         {"LSHIFT",        lshift},
         {"MS",            ms},
@@ -1128,6 +1333,8 @@ void definePrimitives() {
         {"OR",            bitwiseOr},
         {"OVER",          over},
         {"PICK",          pick},
+        {"PROMPT",        prompt},
+        {"QUIT",          quit},
         {"R>",            rFrom},
         {"R@",            rFetch},
         {"REFILL",        refill},
@@ -1138,10 +1345,13 @@ void definePrimitives() {
         {"STATE",         state},
         {"SWAP",          swap},
         {"TIME&DATE",     timeAndDate},
+        {"TYPE",          type},
         {"UNUSED",        unused},
         {"UTCTIME&DATE",  utcTimeAndDate},
+        {"WORD",          word},
         {"WORDS",         words},
-        {"XOR",           bitwiseXor}
+        {"XOR",           bitwiseXor},
+        {"]",             rightBracket}
     };
     for (auto& w: codeWords) {
         defineCodeWord(w.name, w.code);
@@ -1159,7 +1369,9 @@ void initializeDictionary() {
 
 } // end anonymous namespace
 
-extern "C" void resetForth() {
+const char* cxxforthVersion = "0.0.0";
+
+extern "C" void cxxforthReset() {
 
     std::memset(dStack, 0, sizeof(dStack));
     dTop = dStack - 1;
@@ -1173,26 +1385,33 @@ extern "C" void resetForth() {
     initializeDictionary();
 }
 
-extern "C" int runForth(int argc, const char** argv) {
+extern "C" int cxxforthRun(int argc, const char** argv) {
     try {
         commandLineArgCount = static_cast<size_t>(argc);
         commandLineArgVector = argv;
 
-        resetForth();
+        cxxforthReset();
 
-        processInstructions();
+        auto quit = findDefinition("QUIT");
+        if (!quit)
+            throw std::runtime_error("QUIT not defined");
+        quit->execute();
 
         return 0;
     }
     catch (const std::exception& ex) {
-        std::cerr << "Exception: " << ex.what() << std::endl;
+        std::cerr << "cxxforth: " << ex.what() << std::endl;
         return -1;
     }
 }
 
 #ifndef CXXFORTH_NO_MAIN
 int main(int argc, const char** argv) {
-    return runForth(argc, argv);
+    if (argc == 1) {
+        std::cout << "cxxforth " << cxxforthVersion << " <https://bitbucket.org/KristopherJohnson/cxxforth>" << std::endl
+                  << "Type \"bye\" to exit." << std::endl;
+    }
+    return cxxforthRun(argc, argv);
 }
 #endif
 

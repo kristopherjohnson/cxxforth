@@ -3,12 +3,14 @@
 
 #include "cxxforthconfig.h"
 
+extern const char* cxxforthVersion;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void resetForth();
-int runForth(int argc, const char** argv);
+void cxxforthReset();
+int cxxforthRun(int argc, const char** argv);
 
 #ifdef __cplusplus
 }
