@@ -166,19 +166,19 @@ to hold an address.  This generally means that it will be a 32-bit value on
 a 32-bit Forth on a 64-bit platform with clang or gcc, you can pass the `-m32`
 flag to the compiler and linker.)
 
+We won't be providing any of the double-cell operations that traditional Forths
+provide.  Double-cell operations were important in the days of 8-bit and 16-bit
+Forths, but with cells of 32 bits or more, many applications have no need for
+them.
+
+We also aren't dealing with floating-point values.  Floating-point support
+would be useful, but we're trying to keep this simple.
+
 Forth doesn't require type declarations; a cell can be used as an address, an
 unsigned integer, a signed integer, or a variety of other uses.  However, in
 C++ we will have to be explicit about types to perform the operations we want
 to perform.  So, we define a few types, and a few macros to avoid littering our
 code with `reinterpret_cast<>()`.
-
-By the way, we won't be providing any of the double-cell operations that
-traditional Forths provide.  Double-cell operations were important in the days
-of 8-bit and 16-bit Forths, but with cells of 32 bits or more, many
-applications have no need for them.
-
-We also aren't dealing with floating-point values.  Floating-point support
-would be useful, but we're trying to keep this simple.
 
     
     namespace {
@@ -192,15 +192,19 @@ would be useful, but we're trying to keep this simple.
     using CAddr = Char*;  // Any address
     using AAddr = Cell*;  // Cell-aligned address
     
-    #define CELL(x)  reinterpret_cast<Cell>(x)
-    #define CADDR(x) reinterpret_cast<Char*>(x)
-    #define AADDR(x) reinterpret_cast<AAddr>(x)
+    #define CELL(x)    reinterpret_cast<Cell>(x)
+    #define CADDR(x)   reinterpret_cast<Char*>(x)
+    #define AADDR(x)   reinterpret_cast<AAddr>(x)
+    #define CHARPTR(x) reinterpret_cast<char*>(x)
+    #define SIZE_T(x)  static_cast<std::size_t>(x)
     
     constexpr auto CellSize = sizeof(Cell);
     
 
-We define constants for Forth `TRUE` and `FALSE` flag values. Note that the
-Forth standard says that a true flag is a cell with all bits set, unlike C++,
+We define constants for Forth true and false boolean flag values.
+
+Note that the Forth standard says that a true flag is a cell with all bits set,
+unlike the C++ convention of using 1 or any other non-zero value to mean true,
 so we need to be sure to use these constants for all Forth words that return a
 boolean flag.
 
@@ -230,6 +234,10 @@ Note that the `code` field is the first member of the `Definition` struct.
 This means that the address of a `Definition` is also the address of a code
 field.  We will use such an address as our Forth _execution token_ (xt).
 
+`Definition` has a static field `executingWord` that contains the address
+of the `Definition` that was most recently executed.  This can be used by
+`Code` functions to refer to their definitions.
+
     
     using Code = void(*)();
     
@@ -242,7 +250,10 @@ field.  We will use such an address as our Forth _execution token_ (xt).
         static constexpr Cell FlagHidden    = (1 << 1);
         static constexpr Cell FlagImmediate = (1 << 2);
     
+        static const Definition* executingWord;
+    
         void execute() const {
+            executingWord = this;
             code();
         }
     
@@ -320,8 +331,14 @@ empty after it is initialized with the kernel's built-in words.
     Definition* latestDefinition = nullptr;
     
 
-We need a flag to track whether we are in interpreting or compiling state
-(corresponding to Forth's `STATE` variable).
+We have to define the static `executingWord` member declared in `Definition`.
+
+    
+    const Definition* Definition::executingWord = nullptr;
+    
+
+We need a flag to track whether we are in interpreting or compiling state.
+This corresponds to Forth's `STATE` variable.
 
     
     Cell isCompiling = True;
@@ -432,13 +449,12 @@ using a C++ exception to return control to the top-level interpreter.
     }
     
     // ABORT-MESSAGE ( i*x c-addr u -- ) ( R: j*x -- )
-    // Not an ANS Forth word.
     // Same semantics as ABORT", but takes a string address and length instead
     // of parsing message.
     void abortMessage() {
-        auto count = static_cast<std::size_t>(*dTop);
+        auto count = SIZE_T(*dTop);
         pop();
-        auto caddr = reinterpret_cast<char*>(*dTop);
+        auto caddr = CHARPTR(*dTop);
         pop();
         std::string message(caddr, count);
         throw AbortException(message);
@@ -464,7 +480,7 @@ Forth application we can run it on that optimized executable for improvied
 performance.
 
 When the `CXXFORTH_SKIP_RUNTIME_CHECKS` macro is not defined, these macros
-will check conditions and throw a `AbortException` if the assertions fail.
+will check conditions and throw an `AbortException` if the assertions fail.
 We won't go into the details of these macros here.  Later you will see them
 used in the definitions of our primitive Forth words.
 
@@ -788,7 +804,7 @@ using C++ iostream objects.
         REQUIRE_DSTACK_DEPTH(2, "TYPE");
         auto length = static_cast<std::streamsize>(*dTop);
         pop();
-        auto caddr = reinterpret_cast<char*>(*dTop);
+        auto caddr = CHARPTR(*dTop);
         pop();
         std::cout.write(caddr, length);
     }
@@ -834,6 +850,41 @@ using C++ iostream objects.
         else {
             push(False);
         }
+    }
+    
+    // WORD ( char "<chars>ccc<char>" -- c-addr ) 
+    void word() {
+        REQUIRE_DSTACK_DEPTH(1, "WORD");
+        auto delim = static_cast<char>(*dTop);
+        
+        wordBuffer.clear();
+        wordBuffer.push_back(0);  // First char of buffer is length.
+    
+        auto inputSize = inputBuffer.size();
+    
+        // Skip leading delimiters
+        while (inputOffset < inputSize && inputBuffer[inputOffset] == delim)
+            ++inputOffset;
+    
+        // Copy characters until we see the delimiter again.
+        while (inputOffset < inputSize && inputBuffer[inputOffset] != delim) {
+            wordBuffer.push_back(inputBuffer[inputOffset]);
+            ++inputOffset;
+        }
+    
+        // Update the count at the beginning of the string.
+        wordBuffer[0] = static_cast<char>(wordBuffer.size() - 1);
+    
+        // ANS Forth standard says a space character is required after the data.
+        wordBuffer.push_back(' ');
+    
+        *dTop = CELL(wordBuffer.data());
+    }
+    
+    // BL ( -- char )
+    void bl() {
+        REQUIRE_DSTACK_AVAILABLE(1, "BL");
+        push(' ');
     }
     
 
@@ -1064,6 +1115,35 @@ Compilation
         isCompiling = True;
     }
     
+    // (create) ( -- a-addr )
+    // Not an ANS Forth word.
+    // This function performs the execution-time semantics of a CREATEd word.
+    // It puts the word's parameter-field address on the stack.
+    void doCreate() {
+        auto defn = Definition::executingWord;
+        REQUIRE_DSTACK_AVAILABLE(1, defn->name.c_str());
+        push(CELL(defn->parameter));
+    }
+    
+    // CREATE ( "<spaces>name" -- )  Execution: ( -- a-addr )
+    void create() {
+        alignDataPointer();
+    
+        bl(); word(); count();
+        auto length = SIZE_T(*dTop);
+        pop();
+        auto caddr = CHARPTR(*dTop);
+        pop();
+    
+        RUNTIME_ERROR_IF(length < 1, "CREATE: could not parse name");
+        RUNTIME_ERROR_IF(latestDefinition + 1 >= dictionaryLimit, "CREATE: dictionary is full");
+    
+        auto defn = ++latestDefinition;
+        defn->code = doCreate;
+        defn->parameter = AADDR(dataPointer);
+        defn->name = std::string(caddr, length);
+    }
+    
     // IMMEDIATE ( -- )
     void immediate() {
         RUNTIME_ERROR_IF(latestDefinition < dictionary, "IMMEDIATE: no latest definition");
@@ -1073,10 +1153,10 @@ Compilation
     void defineCodeWord(const char* name, Code code) {
         alignDataPointer();
     
-        auto word = ++latestDefinition;
-        word->code = code;
-        word->parameter = AADDR(dataPointer);
-        word->name = name;
+        auto defn = ++latestDefinition;
+        defn->code = code;
+        defn->parameter = AADDR(dataPointer);
+        defn->name = name;
     }
     
     bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
@@ -1193,41 +1273,6 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
 [dpans_3_4]: http://forth.sourceforge.net/std/dpans/dpans3.htm#3.4 "3.4 The Forth text interpreter"
 
     
-    // WORD ( char "<chars>ccc<char>" -- c-addr ) 
-    void word() {
-        REQUIRE_DSTACK_DEPTH(1, "WORD");
-        auto delim = static_cast<char>(*dTop);
-        
-        wordBuffer.clear();
-        wordBuffer.push_back(0);  // First char of buffer is length.
-    
-        auto inputSize = inputBuffer.size();
-    
-        // Skip leading delimiters
-        while (inputOffset < inputSize && inputBuffer[inputOffset] == delim)
-            ++inputOffset;
-    
-        // Copy characters until we see the delimiter again.
-        while (inputOffset < inputSize && inputBuffer[inputOffset] != delim) {
-            wordBuffer.push_back(inputBuffer[inputOffset]);
-            ++inputOffset;
-        }
-    
-        // Update the count at the beginning of the string.
-        wordBuffer[0] = static_cast<char>(wordBuffer.size() - 1);
-    
-        // ANS Forth standard says a space character is required after the data.
-        wordBuffer.push_back(' ');
-    
-        *dTop = CELL(wordBuffer.data());
-    }
-    
-    // BL ( -- char )
-    void bl() {
-        REQUIRE_DSTACK_AVAILABLE(1, "BL");
-        push(' ');
-    }
-    
     // Determine whether specified character is a valid numeric digit for current BASE.
     bool isValidDigit(Char c) {
         if (numericBase > 10) {
@@ -1254,7 +1299,7 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
     void parseNumber() {
         REQUIRE_DSTACK_DEPTH(3, "PARSE-NUMBER");
         
-        auto length = static_cast<std::size_t>(*dTop);
+        auto length = SIZE_T(*dTop);
         auto caddr = CADDR(*(dTop - 1));
         auto value = *(dTop - 2);
     
@@ -1298,7 +1343,7 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
                 // Try to parse it as a number.
     
                 count();
-                auto length = static_cast<std::size_t>(*dTop);
+                auto length = SIZE_T(*dTop);
                 pop();
                 auto caddr = CADDR(*dTop);
                 pop(); 
@@ -1310,7 +1355,7 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
                         push(length);
                         parseNumber();
     
-                        auto remainingLength = static_cast<std::size_t>(*dTop);
+                        auto remainingLength = SIZE_T(*dTop);
                         pop();
                         pop();
                         if (remainingLength == 0) {
@@ -1401,6 +1446,7 @@ working system.
         static struct { const char* name; Code code; } codeWords[] = {
             {"!",             store},
             {"#ARG",          argCount},
+            {"(create)",      doCreate},
             {"(literal)",     doLiteral},
             {"*",             star},
             {"+",             plus},
@@ -1432,6 +1478,7 @@ working system.
             {"CELLS",         cells},
             {"COUNT",         count},
             {"CR",            cr},
+            {"CREATE",        create},
             {"DEPTH",         depth},
             {"DROP",          drop},
             {"DUP",           dup},
