@@ -3,7 +3,7 @@
 # - default    builds 'targets' and 'tags'
 # - all        builds 'targets', 'optimized', and 'tags'
 # - targets    builds cxxforth executable
-# - optimized  builds cxxforth with runtime checks disabled
+# - optimized  builds cxxforth with -O3 and runtime checks disabled
 # - clean      removes build products
 #
 # On a 64-bit platform, invoke make like this to build a 32-bit Forth:
@@ -39,13 +39,13 @@ optimized: $(OPTIMIZEDDIR)/Makefile
 
 $(OPTIMIZEDDIR)/Makefile: CMakeLists.txt Makefile
 	$(MKDIR) -p $(OPTIMIZEDDIR)
-	cd $(OPTIMIZEDDIR) && $(CMAKE) $(CMAKEFLAGS) -DCXXFORTH_SKIP_RUNTIME_CHECKS=ON ..
+	cd $(OPTIMIZEDDIR) && $(CMAKE) $(CMAKEFLAGS) -DCXXFORTH_OPTIMIZED=ON -DCXXFORTH_SKIP_RUNTIME_CHECKS=ON ..
 
 tags: cxxforth.cpp cxxforth.h
 	$(CTAGS) $^
 
 .PHONY: clean
 clean:
-	- $(RM) -r $(BUILDDIR)
-	- $(RM) -r $(OPTIMIZEDDIR)
+	- $(RM) -rf $(BUILDDIR)
+	- $(RM) -rf $(OPTIMIZEDDIR)
 

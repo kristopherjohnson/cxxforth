@@ -7,6 +7,30 @@ by Kristopher Johnson
 
 ----
 
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+----
+
 `cxxforth` is a simple implementation of a [Forth][forth] system in C++.  There
 are many examples of Forth implementations available on the Internet, but most
 of them are written in assembly language or low-level C, with a focus in
@@ -58,30 +82,6 @@ implemented.
 [markdown]: https://daringfireball.net/projects/markdown/ "Markdown"
 
 [dpans]: http://forth.sourceforge.net/std/dpans/dpansf.htm "Alphabetic list of words"
-
-----
-
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
-software, either in source code form or as a compiled binary, for any purpose,
-commercial or non-commercial, and by any means.
-
-In jurisdictions that recognize copyright laws, the author or authors of this
-software dedicate any and all copyright interest in the software to the public
-domain. We make this dedication for the benefit of the public at large and to
-the detriment of our heirs and successors. We intend this dedication to be an
-overt act of relinquishment in perpetuity of all present and future rights to
-this software under copyright law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org/>
 
 ----
 
@@ -384,16 +384,103 @@ words.
 size_t commandLineArgCount = 0;
 const char** commandLineArgVector = nullptr;
 
+/****
+
+Stack Primitives
+----------------
+
+We will be spending a lot of time pushing and popping values to and from our
+data and return stacks, so in lieu of sprinkling pointer arithmetic all through
+our code, we'll define a few simple functions to handle those operations.  We
+can expect the compiler to expand calls to these functions inline, so we aren't
+losing any efficiency.
+
+We will use the expressions `*dTop` and `*rTop` when accessing the top-of-stack
+values without pushing/popping.  We will also use expressions like `*(dTop -
+1)` and `*(dTop - 2)` to reference the items beneath the top of stack.
+
+****/
+
+void resetDStack() {
+    dTop = dStack - 1;
+}
+
+void resetRStack() {
+    rTop = rStack - 1;
+}
+
+std::ptrdiff_t dStackDepth() {
+    return dTop - dStack + 1;
+}
+
+std::ptrdiff_t rStackDepth() {
+    return rTop - rStack + 1;
+}
+
+// Push cell onto data stack.
+void push(Cell x) {
+    *(++dTop) = x;
+}
+
+// Pop cell from data stack.
+void pop() {
+    --dTop;
+}
+
+// Push cell onto return stack.
+void rpush(Cell x) {
+    *(++rTop) = x;
+}
+
+// Pop cell from return stack.
+void rpop() {
+    --rTop;
+}
+
+/****
+
+Exceptions
+----------
+
+Forth provides the `ABORT` and `ABORT"` words, which interrupt execution and
+return control to the main `QUIT` loop.  We will implement this functionality
+using a C++ exception to return control to the top-level interpreter.
+
+****/
+
+class AbortException: public std::runtime_error {
+public:
+    AbortException(const std::string& msg): std::runtime_error(msg) {}
+    AbortException(const char* msg): std::runtime_error(msg) {}
+};
+
+// ABORT ( i*x -- ) ( R: j*x -- ) 
+void abort() {
+    throw AbortException("");
+}
+
+// ABORT-MESSAGE ( i*x c-addr u -- ) ( R: j*x -- )
+// Not an ANS Forth word.
+// Same semantics as ABORT", but takes a string address and length instead
+// of parsing message.
+void abortMessage() {
+    auto count = static_cast<std::size_t>(*dTop);
+    pop();
+    auto caddr = reinterpret_cast<char*>(*dTop);
+    pop();
+    std::string message(caddr, count);
+    throw AbortException(message);
+}
 
 /****
 
 Runtime Safety Checks
 ---------------------
 
-Old-school Forths are apparently implemented by super-programmers who never
-make coding mistakes and so don't want the overhead of bounds-checking or other
-nanny hand-holding.  However, we're just dumb C++ programmers here, and we'd
-like some help to catch our mistakes.
+Old-school Forths are implemented by super-programmers who never make coding
+mistakes and so don't want the overhead of bounds-checking or other nanny
+hand-holding.  However, we're just dumb C++ programmers here, and we'd like
+some help to catch our mistakes.
 
 To that end, we have a set of macros and functions that verify that we have the
 expected number of arguments available on our stacks, that we aren't going to
@@ -406,19 +493,11 @@ Forth application we can run it on that optimized executable for improvied
 performance.
 
 When the `CXXFORTH_SKIP_RUNTIME_CHECKS` macro is not defined, these macros
-will check conditions and throw a `std::runtime_error` if the assertions fail.
+will check conditions and throw a `AbortException` if the assertions fail.
 We won't go into the details of these macros here.  Later you will see them
 used in the definitions of our primitive Forth words.
 
 ****/
-
-std::ptrdiff_t dStackDepth() {
-    return dTop - dStack + 1;
-}
-
-std::ptrdiff_t rStackDepth() {
-    return rTop - rStack + 1;
-}
 
 #ifdef CXXFORTH_SKIP_RUNTIME_CHECKS
 
@@ -434,7 +513,7 @@ std::ptrdiff_t rStackDepth() {
 
 #else
 
-#define RUNTIME_ERROR(msg)                   do { throw std::runtime_error(msg); } while (0)
+#define RUNTIME_ERROR(msg)                   do { throw AbortException(msg); } while (0)
 #define RUNTIME_ERROR_IF(cond, msg)          do { if (cond) RUNTIME_ERROR(msg); } while (0)
 #define REQUIRE_DSTACK_DEPTH(n, name)        requireDStackDepth(n, name)
 #define REQUIRE_DSTACK_AVAILABLE(n, name)    requireDStackAvailable(n, name)
@@ -481,43 +560,6 @@ void requireDataSpaceAvailable(std::size_t n, const char* name) {
 }
 
 #endif // CXXFORTH_SKIP_RUNTIME_CHECKS
-
-/****
-
-Stack Manipulation Primitives
------------------------------
-
-We will be spending a lot of time pushing and popping values to and from our
-data and return stacks, so in lieu of sprinkling pointer arithmetic all through
-our code, we'll define a few simple functions to handle those operations.  We
-can expect the compiler to expand calls to these functions inline, so we aren't
-losing any efficiency.
-
-We will use the expressions `*dTop` and `*rTop` when accessing the top-of-stack
-values without pushing/popping.  We will also use expressions like `*(dTop -
-1)` and `*(dTop - 2)` to reference the items beneath the top of stack.
-
-****/
-
-// Push cell onto data stack.
-void push(Cell x) {
-    *(++dTop) = x;
-}
-
-// Pop cell from data stack.
-void pop() {
-    --dTop;
-}
-
-// Push cell onto return stack.
-void rpush(Cell x) {
-    *(++rTop) = x;
-}
-
-// Pop cell from return stack.
-void rpop() {
-    --rTop;
-}
 
 /****
 
@@ -1165,13 +1207,13 @@ colon definition that called the current word.
 
 void doColon() {
     // TODO
-    throw std::runtime_error("doColon not implemented");
+    throw AbortException("doColon not implemented");
 }
 
 // EXIT ( -- ) ( R: nest-sys -- )
 void exit() {
     // TODO
-    throw std::runtime_error("EXIT not implemented");
+    throw AbortException("EXIT not implemented");
 }
 
 // (literal) ( -- x )
@@ -1179,7 +1221,7 @@ void exit() {
 // Not an ANS Forth word.
 void doLiteral() {
     REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
-    throw std::runtime_error("(literal) not implemented");
+    throw AbortException("(literal) not implemented");
 }
 
 // EXECUTE ( i*x xt -- j*x )
@@ -1325,11 +1367,11 @@ void interpret() {
                         // OK, the number is on the top of the stack.
                     }
                     else {
-                        throw std::runtime_error(std::string("unable to parse number: ") + wordBuffer);
+                        throw AbortException(std::string("unable to parse number: ") + wordBuffer);
                     }
                 }
                 else {
-                    throw std::runtime_error(std::string("unrecognized word: ") + wordBuffer);
+                    throw AbortException(std::string("unrecognized word: ") + wordBuffer);
                 }
             }
             else {
@@ -1356,25 +1398,32 @@ void prompt() {
 }
 
 // QUIT ( -- )
-//
-// TODO: Replace this code primitive with this Forth implementation:
-//
-//   : QUIT  ]  BEGIN REFILL WHILE INTERPRET PROMPT REPEAT  CR BYE ;
-//
 void quit() {
-    // TODO: Use setjmp/longjmp to unnest return stack.
-
+    resetRStack();
     leftBracket();
-    for (;;) {
-        refill();
-        auto refillSuccess = *dTop;
-        pop();
-        if (!refillSuccess)
-            break;
 
-        interpret();
-        prompt();
+    for (;;) {
+        try {
+            refill();
+            auto refillSuccess = *dTop;
+            pop();
+            if (!refillSuccess)
+                break;
+
+            interpret();
+            prompt();
+        }
+        catch (const AbortException& abortEx) {
+            std::string msg(abortEx.what());
+            if (msg.length() > 0) {
+                std::cout << "<<< Error: " << msg << " >>>";
+                cr();
+            }
+            resetDStack();
+            resetRStack();
+        }
     }
+
     cr();
     bye();
 }
@@ -1419,6 +1468,8 @@ void definePrimitives() {
         {">R",            toR},
         {"?DUP",          qdup},
         {"@",             fetch},
+        {"ABORT",         abort},
+        {"ABORT-MESSAGE", abortMessage},
         {"ALIGN",         align},
         {"ALIGNED",       aligned},
         {"ALLOT",         allot},
@@ -1487,7 +1538,7 @@ void initializeDictionary() {
 
 } // end anonymous namespace
 
-const char* cxxforthVersion = "0.0.0";
+const char* cxxforthVersion = "1.0.0";
 
 extern "C" void cxxforthReset() {
 
@@ -1523,10 +1574,20 @@ extern "C" int cxxforthRun(int argc, const char** argv) {
     }
 }
 
+/****
+
+Finally we have our `main()`. If there are no command-line arguments, it prints
+a banner and help message. Then it calls `cxxforthRun()`.
+
+You can define the macro `CXXFORTH_NO_MAIN` to inhibit generation of `main()`.
+This is useful for incorporating `cxxforth.cpp` into another application or
+library.
+
+****/
+
 #ifndef CXXFORTH_NO_MAIN
 
 int main(int argc, const char** argv) {
-    // Print credits and help message if no arguments.
     if (argc == 1) {
         std::cout << "cxxforth "
                   << cxxforthVersion
