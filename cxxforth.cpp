@@ -1550,10 +1550,22 @@ void definePrimitives() {
     static struct {
         const char* name;
         Code code;
-        bool isImmediate = false;
+    } immediateCodeWords[] = {
+        // name           code            
+        // ------------------------------
+        {";",             semicolon},
+    };
+    for (auto& w: immediateCodeWords) {
+        defineCodeWord(w.name, w.code);
+        immediate();
+    }
+    
+    static struct {
+        const char* name;
+        Code code;
     } codeWords[] = {
-        // name           code            immediate
-        // -------------------------------------------
+        // name           code            
+        // ------------------------------
         {"!",             store},
         {"#ARG",          argCount},
         {"(literal)",     doLiteral},
@@ -1565,7 +1577,6 @@ void definePrimitives() {
         {"/",             slash},
         {"/MOD",          slashMod},
         {":",             colon},
-        {";",             semicolon,      true},
         {"<",             lessThan},
         {"=",             equals},
         {">",             greaterThan},
@@ -1627,8 +1638,6 @@ void definePrimitives() {
     };
     for (auto& w: codeWords) {
         defineCodeWord(w.name, w.code);
-        if (w.isImmediate)
-            immediate();
     }
 
     doLiteralXt = findDefinition("(literal)");
