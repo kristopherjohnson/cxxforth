@@ -263,8 +263,12 @@ struct Definition {
     static const Definition* executingWord;
 
     void execute() const {
+        auto previousValue = executingWord;
         executingWord = this;
+
         code();
+
+        executingWord = previousValue;
     }
 
     const char* nameAddress() const {
@@ -632,17 +636,6 @@ void swap() {
     *(dTop - 1) = temp;
 }
 
-// ROT ( x1 x2 x3 -- x2 x3 x1 )
-void rot() {
-    REQUIRE_DSTACK_DEPTH(3, "ROT");
-    auto x1 = *(dTop - 2);
-    auto x2 = *(dTop - 1);
-    auto x3 = *dTop;
-    *dTop = x1;
-    *(dTop - 1) = x3;
-    *(dTop - 2) = x2;
-}
-
 // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
 void pick() {
     REQUIRE_DSTACK_DEPTH(1, "PICK");
@@ -661,16 +654,6 @@ void roll() {
         auto x = *(dTop - index - 1);
         std::memmove(dTop - index - 1, dTop - index, index * sizeof(Cell));
         *dTop = x;
-    }
-}
-
-// ?DUP ( x -- 0 | x x )
-void qdup() {
-    REQUIRE_DSTACK_DEPTH(1, "?DUP");
-    Cell top = *dTop;
-    if (top != 0) {
-        REQUIRE_DSTACK_AVAILABLE(1, "?DUP");
-        push(top);
     }
 }
 
@@ -792,12 +775,6 @@ void allot() {
     REQUIRE_DATASPACE_AVAILABLE(CellSize, "ALLOT");
     dataPointer += *dTop;
     pop();
-}
-
-// CELL+ ( a-addr1 -- a-addr2 )
-void cellPlus() {
-    REQUIRE_DSTACK_DEPTH(1, "CELL+");
-    *dTop += CellSize;
 }
 
 // CELLS ( n1 -- n2 )
@@ -1181,16 +1158,6 @@ void state() {
     push(CELL(&isCompiling));
 }
 
-// [ ( -- )
-void leftBracket() {
-    isCompiling = False;
-}
-
-// ] ( -- )
-void rightBracket() {
-    isCompiling = True;
-}
-
 // (create) ( -- a-addr )
 // Not an ANS Forth word.
 // This function performs the execution-time semantics of a CREATEd word.
@@ -1470,7 +1437,7 @@ void prompt() {
 // QUIT ( -- )
 void quit() {
     resetRStack();
-    leftBracket();
+    isCompiling = false;
 
     for (;;) {
         try {
@@ -1510,15 +1477,6 @@ working system.
 ****/
 
 void definePrimitives() {
-    // Immediate words
-    static struct { const char* name; Code code; } immediateWords[] = {
-        {"[",             leftBracket}
-    };
-    for (auto& w: immediateWords) {
-        defineCodeWord(w.name, w.code);
-        immediate();
-    }
-
     // Non-immediate words
     static struct { const char* name; Code code; } codeWords[] = {
         {"!",             store},
@@ -1537,7 +1495,6 @@ void definePrimitives() {
         {">",             greaterThan},
         {">IN",           in},
         {">R",            toR},
-        {"?DUP",          qdup},
         {"@",             fetch},
         {"ABORT",         abort},
         {"ABORT-MESSAGE", abortMessage},
@@ -1551,7 +1508,6 @@ void definePrimitives() {
         {"BYE",           bye},
         {"C!",            cstore},
         {"C@",            cfetch},
-        {"CELL+",         cellPlus},
         {"CELLS",         cells},
         {"COUNT",         count},
         {"CR",            cr},
@@ -1580,7 +1536,6 @@ void definePrimitives() {
         {"R@",            rFetch},
         {"REFILL",        refill},
         {"ROLL",          roll},
-        {"ROT",           rot},
         {"RSHIFT",        rshift},
         {"SOURCE",        source},
         {"STATE",         state},
@@ -1592,7 +1547,6 @@ void definePrimitives() {
         {"WORD",          word},
         {"WORDS",         words},
         {"XOR",           bitwiseXor},
-        {"]",             rightBracket}
     };
     for (auto& w: codeWords) {
         defineCodeWord(w.name, w.code);
