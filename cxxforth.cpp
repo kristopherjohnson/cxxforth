@@ -388,6 +388,11 @@ We need a buffer to store the result of the Forth `WORD` word.  As with the
 input buffer, we use a `std::string` so we don't need to worry about memory
 management.
 
+Note that while we are using a `std:string`, we can't just use it like one.
+The buffer returned by `WORD` has the word length as its first character.
+So if we need to display the contents of this buffer, we will need to
+convert it to a real string.
+
 ****/
 
 std::string wordBuffer;
@@ -892,6 +897,25 @@ void refill() {
     }
 }
 
+/****
+
+The text interpreter and many Forth words use `WORD` to parse a set of
+characters from the input.  `WORD` skips any delimiters at the current input
+position, then reads characters until it finds the delimiter again.  It returns
+the address of a buffer with the length in the first byte, followed by the
+characters that made up the word.
+
+In a few places below, you will see the call sequence `bl(); word(); count();`
+This corresponds to the Forth phrase `BL WORD COUNT`, which is how many Forth
+definitions read a space-delimited word from the input and get its address and
+length.
+
+The ANS Forth draft standard specifies that the buffer must contain a space
+character after the character data, but we aren't going to worry about this
+obsolescent requirement.
+
+****/
+
 // WORD ( char "<chars>ccc<char>" -- c-addr ) 
 void word() {
     REQUIRE_DSTACK_DEPTH(1, "WORD");
@@ -912,14 +936,18 @@ void word() {
         ++inputOffset;
     }
 
-    // Update the count at the beginning of the string.
+    // Update the count at the beginning of the buffer.
     wordBuffer[0] = static_cast<char>(wordBuffer.size() - 1);
-
-    // ANS Forth standard says a space character is required after the data.
-    wordBuffer.push_back(' ');
 
     *dTop = CELL(wordBuffer.data());
 }
+
+/****
+
+`BL` puts a space character on the stack.  It is often used as `BL WORD` to
+parse a space-delimited word.
+
+****/
 
 // BL ( -- char )
 void bl() {
@@ -1397,11 +1425,11 @@ void interpret() {
             count();
             auto length = SIZE_T(*dTop);
             pop();
-            auto caddr = CADDR(*dTop);
+            auto caddr = CHARPTR(*dTop);
             pop(); 
 
             if (length > 0) {
-                if (isValidDigit(*caddr)) {
+                if (isValidDigit(static_cast<Char>(*caddr))) {
                     push(0);
                     push(CELL(caddr));
                     push(length);
@@ -1414,11 +1442,11 @@ void interpret() {
                         // OK, the number is on the top of the stack.
                     }
                     else {
-                        throw AbortException(std::string("unable to parse number: ") + wordBuffer);
+                        throw AbortException(std::string("unable to parse number: ") + std::string(caddr, length));
                     }
                 }
                 else {
-                    throw AbortException(std::string("unrecognized word: ") + wordBuffer);
+                    throw AbortException(std::string("unrecognized word: ") + std::string(caddr, length));
                 }
             }
             else {
@@ -1432,14 +1460,9 @@ void interpret() {
 // PROMPT ( -- )
 // Not an ANS Forth word.
 // Displays "ok" prompt if in interpretation mode.
-//
-// TODO: Replace this code primitive with this Forth implementation:
-//
-//   : PROMPT  STATE @ IF ."  OK" CR THEN ;
-//
 void prompt() {
     if (!isCompiling) {
-        std::cout << " ok";
+        std::cout << "  ok";
         cr();
     }
 }
@@ -1452,23 +1475,23 @@ void quit() {
     for (;;) {
         try {
             refill();
-            auto refillSuccess = *dTop;
+            auto refilled = *dTop;
             pop();
-            if (!refillSuccess)
+            if (!refilled)
                 break;
 
             interpret();
-            prompt();
         }
         catch (const AbortException& abortEx) {
             std::string msg(abortEx.what());
             if (msg.length() > 0) {
                 std::cout << "<<< Error: " << msg << " >>>";
-                cr();
             }
             resetDStack();
             resetRStack();
         }
+
+        prompt();
     }
 
     cr();
