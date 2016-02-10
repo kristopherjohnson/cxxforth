@@ -350,11 +350,31 @@ Definition* latestDefinition = nullptr;
 
 /****
 
+The colon-definition interpreter needs a pointer to the next instruction to be
+executed.
+
+****/
+
+Definition** next = nullptr;
+
+/****
+
 We have to define the static `executingWord` member declared in `Definition`.
 
 ****/
 
 const Definition* Definition::executingWord = nullptr;
+
+/****
+
+There are a couple of special words whose addresses we will use frequently when
+compiling or executing.  Rather than looking them up in the dictionary as
+needed, we'll cache their values.
+
+****/
+
+const Definition* doLiteralXt = nullptr;
+const Definition* exitXt      = nullptr;
 
 /****
 
@@ -839,6 +859,12 @@ void cr() {
 // . ( n -- )
 void dot() {
     REQUIRE_DSTACK_DEPTH(1, ".");
+    std::cout << std::setbase(static_cast<int>(numericBase)) << static_cast<SCell>(*dTop) << " ";
+    pop();
+}
+
+void uDot() {
+    REQUIRE_DSTACK_DEPTH(1, "U.");
     std::cout << std::setbase(static_cast<int>(numericBase)) << *dTop << " ";
     pop();
 }
@@ -1145,6 +1171,67 @@ void dotS() {
     }
 }
 
+/****
+
+Inner Interpreter
+-----------------
+
+A Forth system is said to have two interpreters: an "outer interpreter" which
+reads input and interprets it, and an "inner interpreter" which executes
+compiled Forth definitions.  We'll start with the inner interpreter.
+
+There are basically two kinds of words in a Forth system:
+
+- primitive code: native code fragments that are executed directly by the CPU
+- colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
+
+Every defined word has a `code` field that points to native code.  In the case
+of "code" words, the `code` field points to a routine that performs the
+operation.  In the case of a colon definition, the `code` field points to the
+`doColon()` function, which saves the current program state and then starts
+executing the words that make up the colon definition.
+
+Each colon definition ends with a call to `EXIT`, which sets up a return to the
+colon definition that called the current word.
+
+****/
+
+void doColon() {
+    rpush(CELL(next));
+
+    auto defn = Definition::executingWord;
+
+    next = reinterpret_cast<Definition**>(defn->parameter);
+    while (*next != exitXt) {
+        (*(next++))->execute();
+    }
+
+    next = reinterpret_cast<Definition**>(*rTop);
+    rpop();
+}
+
+// EXIT ( -- ) ( R: nest-sys -- )
+void exit() {
+    throw std::runtime_error("EXIT should not be executed");
+}
+
+// (literal) ( -- x )
+// Compiled by LITERAL.
+// Not an ANS Forth word.
+void doLiteral() {
+    REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
+    push(CELL(*next));
+    ++next;
+}
+
+// EXECUTE ( i*x xt -- j*x )
+void execute() {
+    REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
+    auto defn = reinterpret_cast<Definition*>(*dTop);
+    pop();
+    defn->execute();
+}
+
 /**** 
  
 Compilation
@@ -1185,6 +1272,21 @@ void create() {
     defn->code = doCreate;
     defn->parameter = AADDR(dataPointer);
     defn->name = std::string(caddr, length);
+}
+
+// : ( C: "<spaces>name" -- colon-sys )
+void colon() {
+    create();
+    isCompiling = true;
+    latestDefinition->code = doColon;
+    latestDefinition->setHidden(true);
+}
+
+// ; ( C: colon-sys -- )
+void semicolon() {
+    data(CELL(exitXt));
+    isCompiling = false;
+    latestDefinition->setHidden(false);
 }
 
 // IMMEDIATE ( -- )
@@ -1259,58 +1361,6 @@ void words() {
 
 /****
 
-Inner Interpreter
------------------
-
-A Forth system is said to have two interpreters: an "outer interpreter" which
-reads input and interprets it, and an "inner interpreter" which executes
-compiled Forth definitions.  We'll start with the inner interpreter.
-
-There are basically two kinds of words in a Forth system:
-
-- primitive code: native code fragments that are executed directly by the CPU
-- colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
-
-Every defined word has a `code` field that points to native code.  In the case
-of "code" words, the `code` field points to a routine that performs the
-operation.  In the case of a colon definition, the `code` field points to the
-`doColon()` function, which saves the current program state and then starts
-executing the words that make up the colon definition.
-
-Each colon definition ends with a call to `EXIT`, which sets up a return to the
-colon definition that called the current word.
-
-****/
-
-void doColon() {
-    // TODO
-    throw AbortException("doColon not implemented");
-}
-
-// EXIT ( -- ) ( R: nest-sys -- )
-void exit() {
-    // TODO
-    throw AbortException("EXIT not implemented");
-}
-
-// (literal) ( -- x )
-// Compiled by LITERAL.
-// Not an ANS Forth word.
-void doLiteral() {
-    REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
-    throw AbortException("(literal) not implemented");
-}
-
-// EXECUTE ( i*x xt -- j*x )
-void execute() {
-    REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
-    auto word = reinterpret_cast<Definition*>(*dTop);
-    pop();
-    word->execute();
-}
-
-/****
-
 Outer Interpreter
 -----------------
 
@@ -1380,10 +1430,12 @@ void interpret() {
         pop();  
         
         if (found) {
-            // TODO: If compiling, compile.
             auto xt = reinterpret_cast<Definition*>(*dTop);
             pop();
-            xt->execute();
+            if (isCompiling && !xt->isImmediate())
+                data(CELL(xt));
+            else
+                xt->execute();
         }
         else {
             // find() left the counted string on the stack.
@@ -1407,6 +1459,11 @@ void interpret() {
                     pop();
                     if (remainingLength == 0) {
                         // OK, the number is on the top of the stack.
+                        if (isCompiling) {
+                            data(CELL(doLiteralXt));
+                            data(*dTop);
+                            pop();
+                        }
                     }
                     else {
                         throw AbortException(std::string("unable to parse number: ") + std::string(caddr, length));
@@ -1434,6 +1491,19 @@ void prompt() {
     }
 }
 
+/****
+
+`QUIT` is the top-level outer interpreter loop. It calls `REFILL` to read a
+line, `INTERPRET` to parse and execute that line, then `PROMPT` and repeat
+until there is no more input.
+
+There is an exception handler for `AbortException` that prints an error
+message, resets the stacks, and continues.
+
+If end-of-input occurs, then it exits the loop and calls `CR` and `BYE`.
+
+****/
+
 // QUIT ( -- )
 void quit() {
     resetRStack();
@@ -1444,7 +1514,7 @@ void quit() {
             refill();
             auto refilled = *dTop;
             pop();
-            if (!refilled)
+            if (!refilled) // end-of-input
                 break;
 
             interpret();
@@ -1477,11 +1547,15 @@ working system.
 ****/
 
 void definePrimitives() {
-    // Non-immediate words
-    static struct { const char* name; Code code; } codeWords[] = {
+    static struct {
+        const char* name;
+        Code code;
+        bool isImmediate = false;
+    } codeWords[] = {
+        // name           code            immediate
+        // -------------------------------------------
         {"!",             store},
         {"#ARG",          argCount},
-        {"(create)",      doCreate},
         {"(literal)",     doLiteral},
         {"*",             star},
         {"+",             plus},
@@ -1490,6 +1564,8 @@ void definePrimitives() {
         {".S",            dotS},
         {"/",             slash},
         {"/MOD",          slashMod},
+        {":",             colon},
+        {";",             semicolon,      true},
         {"<",             lessThan},
         {"=",             equals},
         {">",             greaterThan},
@@ -1542,6 +1618,7 @@ void definePrimitives() {
         {"SWAP",          swap},
         {"TIME&DATE",     timeAndDate},
         {"TYPE",          type},
+        {"U.",            uDot},
         {"UNUSED",        unused},
         {"UTCTIME&DATE",  utcTimeAndDate},
         {"WORD",          word},
@@ -1550,7 +1627,15 @@ void definePrimitives() {
     };
     for (auto& w: codeWords) {
         defineCodeWord(w.name, w.code);
+        if (w.isImmediate)
+            immediate();
     }
+
+    doLiteralXt = findDefinition("(literal)");
+    if (doLiteralXt == nullptr) throw std::runtime_error("Can't find (literal) in kernel dictionary");
+    
+    exitXt = findDefinition("EXIT");
+    if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
 }
 
 void initializeDictionary() {
