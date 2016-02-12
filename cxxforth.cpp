@@ -680,6 +680,18 @@ void roll() {
     }
 }
 
+// TRUE ( -- flag )
+void pushTrue() {
+    REQUIRE_DSTACK_AVAILABLE(1, "TRUE");
+    push(True);
+}
+
+// FALSE ( -- flag )
+void pushFalse() {
+    REQUIRE_DSTACK_AVAILABLE(1, "FALSE");
+    push(False);
+}
+
 // >R ( x -- ) ( R:  -- x )
 void toR() {
     REQUIRE_DSTACK_DEPTH(1, ">R");
@@ -896,10 +908,10 @@ void refill() {
     REQUIRE_DSTACK_AVAILABLE(1, "REFILL");
     if (std::getline(std::cin, inputBuffer)) {
         inputOffset = 0;
-        push(True);
+        pushTrue();
     }
     else {
-        push(False);
+        pushFalse();
     }
 }
 
@@ -1617,6 +1629,7 @@ void definePrimitives() {
         {"EMIT",          emit},
         {"EXECUTE",       execute},
         {"EXIT",          exit},
+        {"FALSE",         pushFalse},
         {"FIND",          find},
         {"HERE",          here},
         {"IMMEDIATE",     immediate},
@@ -1640,6 +1653,7 @@ void definePrimitives() {
         {"STATE",         state},
         {"SWAP",          swap},
         {"TIME&DATE",     timeAndDate},
+        {"TRUE",          pushTrue},
         {"TYPE",          type},
         {"U.",            uDot},
         {"UNUSED",        unused},
