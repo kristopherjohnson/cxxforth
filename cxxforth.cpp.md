@@ -325,15 +325,10 @@ stack.  The stacks grow upward.  When a stack is empty, the associated pointer
 points to an address below the actual bottom of the array, so we will need to
 avoid dereferencing these pointers under those circumstances.
 
-Finally, we need a pointer to the last member of the `Definition` array.  As
-with the stack pointers, this pointer is not valid when the dictionary is
-empty, but we don't need to worry much about it because the array won't be
-empty after it is initialized with the kernel's built-in words.
-
     
-    CAddr       dataPointer      = nullptr;
-    AAddr       dTop             = nullptr;
-    AAddr       rTop             = nullptr;
+    CAddr dataPointer = nullptr;
+    AAddr dTop        = nullptr;
+    AAddr rTop        = nullptr;
     
 
 The colon-definition interpreter needs a pointer to the next instruction to be
@@ -343,7 +338,8 @@ executed.
     Definition** next = nullptr;
     
 
-We have to define the static `executingWord` member declared in `Definition`.
+We have to define the static `executingWord` member we declared in
+`Definition`.
 
     
     const Definition* Definition::executingWord = nullptr;
@@ -478,10 +474,8 @@ using a C++ exception to return control to the top-level interpreter.
     // Same semantics as ABORT", but takes a string address and length instead
     // of parsing message.
     void abortMessage() {
-        auto count = SIZE_T(*dTop);
-        pop();
-        auto caddr = CHARPTR(*dTop);
-        pop();
+        auto count = SIZE_T(*dTop); pop();
+        auto caddr = CHARPTR(*dTop); pop();
         std::string message(caddr, count);
         throw AbortException(message);
     }
@@ -630,8 +624,7 @@ are supposed to do.
     // ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
     void roll() {
         REQUIRE_DSTACK_DEPTH(1, "ROLL");
-        auto index = *dTop;
-        pop();
+        auto index = *dTop; pop();
         if (index > 0) {
             REQUIRE_DSTACK_DEPTH(index + 1, "ROLL");
             auto x = *(dTop - index - 1);
@@ -656,16 +649,14 @@ are supposed to do.
     void toR() {
         REQUIRE_DSTACK_DEPTH(1, ">R");
         REQUIRE_RSTACK_AVAILABLE(1, ">R");
-        rpush(*dTop);
-        pop();
+        rpush(*dTop); pop();
     }
     
     // R> ( -- x ) ( R: x -- )
     void rFrom() {
         REQUIRE_RSTACK_DEPTH(1, "R>");
         REQUIRE_DSTACK_AVAILABLE(1, "R>");
-        push(*rTop);
-        rpop();
+        push(*rTop); rpop();
     }
     
     // R@ ( -- x ) ( R: x -- x )
@@ -683,11 +674,9 @@ values in data space.
     // ! ( x a-addr -- )
     void store() {
         REQUIRE_DSTACK_DEPTH(2, "!");
-        auto aaddr = AADDR(*dTop);
+        auto aaddr = AADDR(*dTop); pop();
         REQUIRE_ALIGNED(aaddr, "!");
-        pop();
-        auto x = *dTop;
-        pop();
+        auto x = *dTop; pop();
         *aaddr = x;
     }
     
@@ -702,10 +691,8 @@ values in data space.
     // c! ( char c-addr -- )
     void cstore() {
         REQUIRE_DSTACK_DEPTH(2, "C!");
-        auto caddr = CADDR(*dTop);
-        pop();
-        auto x = *dTop;
-        pop();
+        auto caddr = CADDR(*dTop); pop();
+        auto x = *dTop; pop();
         *caddr = static_cast<Char>(x);
     }
     
@@ -764,8 +751,7 @@ space pointer.
         REQUIRE_DSTACK_DEPTH(1, "ALLOT");
         REQUIRE_VALID_HERE("ALLOT");
         REQUIRE_DATASPACE_AVAILABLE(CellSize, "ALLOT");
-        dataPointer += *dTop;
-        pop();
+        dataPointer += *dTop; pop();
     }
     
     // CELLS ( n1 -- n2 )
@@ -805,18 +791,15 @@ using C++ iostream objects.
     // EMIT ( x -- )
     void emit() {
         REQUIRE_DSTACK_DEPTH(1, "EMIT");
-        auto cell = *dTop;
-        pop();
+        auto cell = *dTop; pop();
         std::cout.put(static_cast<char>(cell));
     }
     
     // TYPE ( c-addr u -- )
     void type() {
         REQUIRE_DSTACK_DEPTH(2, "TYPE");
-        auto length = static_cast<std::streamsize>(*dTop);
-        pop();
-        auto caddr = CHARPTR(*dTop);
-        pop();
+        auto length = static_cast<std::streamsize>(*dTop); pop();
+        auto caddr = CHARPTR(*dTop); pop();
         std::cout.write(caddr, length);
     }
     
@@ -930,8 +913,7 @@ Define arithmetic primitives.
     // + ( n1 n2 -- n3 )
     void plus() {
         REQUIRE_DSTACK_DEPTH(2, "+");
-        auto n2 = static_cast<SCell>(*dTop);
-        pop();
+        auto n2 = static_cast<SCell>(*dTop); pop();
         auto n1 = static_cast<SCell>(*dTop);
         *dTop = static_cast<Cell>(n1 + n2);
     }
@@ -939,8 +921,7 @@ Define arithmetic primitives.
     // - ( n1 n2 -- n3 )
     void minus() {
         REQUIRE_DSTACK_DEPTH(2, "-");
-        auto n2 = static_cast<SCell>(*dTop);
-        pop();
+        auto n2 = static_cast<SCell>(*dTop); pop();
         auto n1 = static_cast<SCell>(*dTop);
         *dTop = static_cast<Cell>(n1 - n2);
     }
@@ -948,8 +929,7 @@ Define arithmetic primitives.
     // * ( n1 n2 -- n3 )
     void star() {
         REQUIRE_DSTACK_DEPTH(2, "*");
-        auto n2 = static_cast<SCell>(*dTop);
-        pop();
+        auto n2 = static_cast<SCell>(*dTop); pop();
         auto n1 = static_cast<SCell>(*dTop);
         *dTop = static_cast<Cell>(n1 * n2);
     }
@@ -957,8 +937,7 @@ Define arithmetic primitives.
     // / ( n1 n2 -- n3 )
     void slash() {
         REQUIRE_DSTACK_DEPTH(2, "/");
-        auto n2 = static_cast<SCell>(*dTop);
-        pop();
+        auto n2 = static_cast<SCell>(*dTop); pop();
         auto n1 = static_cast<SCell>(*dTop);
         RUNTIME_ERROR_IF(n2 == 0, "/: zero divisor");
         *dTop = static_cast<Cell>(n1 / n2);
@@ -988,24 +967,21 @@ Define logical and relational primitives.
     // AND ( x1 x2 -- x3 )
     void bitwiseAnd() {
         REQUIRE_DSTACK_DEPTH(2, "AND");
-        auto x2 = *dTop;
-        pop();
+        auto x2 = *dTop; pop();
         *dTop = *dTop & x2;
     }
     
     // OR ( x1 x2 -- x3 )
     void bitwiseOr() {
         REQUIRE_DSTACK_DEPTH(2, "OR");
-        auto x2 = *dTop;
-        pop();
+        auto x2 = *dTop; pop();
         *dTop = *dTop | x2;
     }
     
     // XOR ( x1 x2 -- x3 )
     void bitwiseXor() {
         REQUIRE_DSTACK_DEPTH(2, "XOR");
-        auto x2 = *dTop;
-        pop();
+        auto x2 = *dTop; pop();
         *dTop = *dTop ^ x2;
     }
     
@@ -1018,40 +994,35 @@ Define logical and relational primitives.
     // LSHIFT ( x1 u -- x2 )
     void lshift() {
         REQUIRE_DSTACK_DEPTH(2, "LSHIFT");
-        auto n = *dTop;
-        pop();
+        auto n = *dTop; pop();
         *dTop <<= n;
     }
     
     // RSHIFT ( x1 u -- x2 )
     void rshift() {
         REQUIRE_DSTACK_DEPTH(2, "RSHIFT");
-        auto n = *dTop;
-        pop();
+        auto n = *dTop; pop();
         *dTop >>= n;
     }
     
     // = ( x1 x2 -- flag )
     void equals() {
         REQUIRE_DSTACK_DEPTH(2, "=");
-        auto n2 = *dTop;
-        pop();
+        auto n2 = *dTop; pop();
         *dTop = *dTop == n2 ? True : False;
     }
     
     // < ( n1 n2 -- flag )
     void lessThan() {
         REQUIRE_DSTACK_DEPTH(2, "<");
-        auto n2 = static_cast<SCell>(*dTop);
-        pop();
+        auto n2 = static_cast<SCell>(*dTop); pop();
         *dTop = static_cast<SCell>(*dTop) < n2 ? True : False;
     }
     
     // > ( n1 n2 -- flag )
     void greaterThan() {
         REQUIRE_DSTACK_DEPTH(2, ">");
-        auto n2 = static_cast<SCell>(*dTop);
-        pop();
+        auto n2 = static_cast<SCell>(*dTop); pop();
         *dTop = static_cast<SCell>(*dTop) > n2 ? True : False;
     }
     
@@ -1088,8 +1059,7 @@ Define system and environmental primitives
     // MS ( u -- )
     void ms() {
         REQUIRE_DSTACK_DEPTH(1, "MS");
-        auto period = *dTop;
-        pop();
+        auto period = *dTop; pop();
         std::this_thread::sleep_for(std::chrono::milliseconds(period));
     }
     
@@ -1163,8 +1133,7 @@ colon definition that called the current word.
             (*(next++))->execute();
         }
     
-        next = reinterpret_cast<Definition**>(*rTop);
-        rpop();
+        next = reinterpret_cast<Definition**>(*rTop); rpop();
     }
     
     // EXIT ( -- ) ( R: nest-sys -- )
@@ -1184,8 +1153,7 @@ colon definition that called the current word.
     // EXECUTE ( i*x xt -- j*x )
     void execute() {
         REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
-        auto defn = reinterpret_cast<Definition*>(*dTop);
-        pop();
+        auto defn = reinterpret_cast<Definition*>(*dTop); pop();
         defn->execute();
     }
     
@@ -1221,10 +1189,8 @@ Compilation
         alignDataPointer();
     
         bl(); word(); count();
-        auto length = SIZE_T(*dTop);
-        pop();
-        auto caddr = CHARPTR(*dTop);
-        pop();
+        auto length = SIZE_T(*dTop); pop();
+        auto caddr = CHARPTR(*dTop); pop();
     
         RUNTIME_ERROR_IF(length < 1, "CREATE: could not parse name");
     
@@ -1388,12 +1354,10 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
         while (inputOffset < inputSize) {
             bl(); word(); find();
     
-            auto found = static_cast<int>(*dTop);
-            pop();  
+            auto found = static_cast<int>(*dTop); pop();  
             
             if (found) {
-                auto xt = reinterpret_cast<Definition*>(*dTop);
-                pop();
+                auto xt = reinterpret_cast<Definition*>(*dTop); pop();
                 if (isCompiling && !xt->isImmediate())
                     data(CELL(xt));
                 else
@@ -1404,10 +1368,8 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
                 // Try to parse it as a number.
     
                 count();
-                auto length = SIZE_T(*dTop);
-                pop();
-                auto caddr = CHARPTR(*dTop);
-                pop(); 
+                auto length = SIZE_T(*dTop); pop();
+                auto caddr = CHARPTR(*dTop); pop(); 
     
                 if (length > 0) {
                     if (isValidDigit(static_cast<Char>(*caddr))) {
@@ -1416,15 +1378,13 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
                         push(length);
                         parseNumber();
     
-                        auto remainingLength = SIZE_T(*dTop);
-                        pop();
-                        pop();
+                        auto remainingLength = SIZE_T(*dTop); pop();
+                        pop(); // Drop the address
                         if (remainingLength == 0) {
                             // OK, the number is on the top of the stack.
                             if (isCompiling) {
                                 data(CELL(doLiteralXt));
-                                data(*dTop);
-                                pop();
+                                data(*dTop); pop();
                             }
                         }
                         else {
@@ -1472,8 +1432,7 @@ If end-of-input occurs, then it exits the loop and calls `CR` and `BYE`.
         for (;;) {
             try {
                 refill();
-                auto refilled = *dTop;
-                pop();
+                auto refilled = *dTop; pop();
                 if (!refilled) // end-of-input
                     break;
     
@@ -1673,5 +1632,4 @@ library.
     }
     
     #endif // CXXFORTH_NO_MAIN
-    
     
