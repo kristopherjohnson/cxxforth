@@ -130,6 +130,7 @@ the `cxxforthconfig.h` file produced by the CMake build.
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -156,10 +157,6 @@ in case they have not been defined.
 
 #ifndef CXXFORTH_RSTACK_COUNT
 #define CXXFORTH_RSTACK_COUNT (256)
-#endif
-
-#ifndef CXXFORTH_DEFINITIONS_COUNT
-#define CXXFORTH_DEFINITIONS_COUNT (4096)
 #endif
 
 /****
@@ -305,8 +302,8 @@ struct Definition {
 
 /****
 
-With our types defined, we can define our global variables.  We have the Forth
-data space, data and return stacks, and the array of `Definitions`.
+With our types defined, we can define our global variables.  We start with the
+Forth data space, data and return stacks.
 
 For each of these arrays, we also define constants that point to the end of the
 array, so we can easily test whether we have filled them and need to report an
@@ -314,15 +311,22 @@ overflow.
 
 ****/
 
-Char       dataSpace[CXXFORTH_DATASPACE_SIZE];
-Cell       dStack[CXXFORTH_DSTACK_COUNT];
-Cell       rStack[CXXFORTH_RSTACK_COUNT];
-Definition dictionary[CXXFORTH_DEFINITIONS_COUNT];
+Char dataSpace[CXXFORTH_DATASPACE_SIZE];
+Cell dStack[CXXFORTH_DSTACK_COUNT];
+Cell rStack[CXXFORTH_RSTACK_COUNT];
 
-constexpr CAddr       dataSpaceLimit  = &dataSpace[CXXFORTH_DATASPACE_SIZE];
-constexpr AAddr       dStackLimit     = &dStack[CXXFORTH_DSTACK_COUNT];
-constexpr AAddr       rStackLimit     = &rStack[CXXFORTH_RSTACK_COUNT];
-constexpr Definition* dictionaryLimit = &dictionary[CXXFORTH_DEFINITIONS_COUNT];
+constexpr CAddr dataSpaceLimit = &dataSpace[CXXFORTH_DATASPACE_SIZE];
+constexpr AAddr dStackLimit    = &dStack[CXXFORTH_DSTACK_COUNT];
+constexpr AAddr rStackLimit    = &rStack[CXXFORTH_RSTACK_COUNT];
+
+/****
+
+The Forth dictionary is a list of Definitions.  The most recent definition is
+at the back of the list.
+
+****/
+
+std::list<Definition> definitions;
 
 /****
 
@@ -346,7 +350,6 @@ empty after it is initialized with the kernel's built-in words.
 CAddr       dataPointer      = nullptr;
 AAddr       dTop             = nullptr;
 AAddr       rTop             = nullptr;
-Definition* latestDefinition = nullptr;
 
 /****
 
@@ -1239,6 +1242,12 @@ Compilation
 
 ****/
 
+// Return reference to the latest Definition.
+// Undefined behavior if the definitions list is empty.
+Definition& lastDefinition() {
+    return definitions.back();
+}
+
 // STATE ( -- a-addr )
 void state() {
     REQUIRE_DSTACK_AVAILABLE(1, "STATE");
@@ -1266,42 +1275,44 @@ void create() {
     pop();
 
     RUNTIME_ERROR_IF(length < 1, "CREATE: could not parse name");
-    RUNTIME_ERROR_IF(latestDefinition + 1 >= dictionaryLimit, "CREATE: dictionary is full");
 
-    auto defn = ++latestDefinition;
-    defn->code = doCreate;
-    defn->parameter = AADDR(dataPointer);
-    defn->name = std::string(caddr, length);
+    Definition defn;
+    defn.code = doCreate;
+    defn.parameter = AADDR(dataPointer);
+    defn.name = std::string(caddr, length);
+    definitions.emplace_back(std::move(defn));
 }
 
 // : ( C: "<spaces>name" -- colon-sys )
 void colon() {
     create();
     isCompiling = true;
-    latestDefinition->code = doColon;
-    latestDefinition->setHidden(true);
+
+    auto& latest = lastDefinition();
+    latest.code = doColon;
+    latest.setHidden(true);
 }
 
 // ; ( C: colon-sys -- )
 void semicolon() {
     data(CELL(exitXt));
     isCompiling = false;
-    latestDefinition->setHidden(false);
+    lastDefinition().setHidden(false);
 }
 
 // IMMEDIATE ( -- )
 void immediate() {
-    RUNTIME_ERROR_IF(latestDefinition < dictionary, "IMMEDIATE: no latest definition");
-    latestDefinition->setImmediate(true);
+    lastDefinition().setImmediate(true);
 }
 
 void defineCodeWord(const char* name, Code code) {
     alignDataPointer();
 
-    auto defn = ++latestDefinition;
-    defn->code = code;
-    defn->parameter = AADDR(dataPointer);
-    defn->name = name;
+    Definition defn;
+    defn.code = code;
+    defn.parameter = AADDR(dataPointer);
+    defn.name = name;
+    definitions.emplace_back(std::move(defn));
 }
 
 bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
@@ -1317,14 +1328,15 @@ Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
     if (nameLength == 0)
         return nullptr;
 
-    for (auto defn = latestDefinition; defn >= dictionary; --defn) {
-        if (defn->isHidden())
+    for (auto i = definitions.rbegin(); i != definitions.rend(); ++i) {
+        auto& defn = *i;
+        if (defn.isHidden())
             continue;
-        auto& name = defn->name;
+        auto& name = defn.name;
         if (name.length() == nameLength) {
             auto nameCAddr = CADDR(const_cast<char*>(name.data()));
             if (doNamesMatch(nameToFind, nameCAddr, nameLength)) {
-                return defn;
+                return &defn;
             }
         }
     }
@@ -1354,9 +1366,9 @@ void find() {
 
 // WORDS ( -- )
 void words() {
-    for (auto word = latestDefinition; word >= dictionary; --word) {
-        std::cout << word->name << " ";
-    }
+    std::for_each(definitions.rbegin(), definitions.rend(), [](auto& word) {
+        std::cout << word.name << " ";
+    });
 }
 
 /****
@@ -1540,7 +1552,7 @@ void quit() {
 Initialization
 --------------
 
-In `initializeDictionary()`, we set up the initial contents of the dictionary.
+In `initializeDefinitions()`, we set up the initial contents of the dictionary.
 This is the Forth kernel that Forth code can use to implement the rest of a
 working system.
 
@@ -1647,12 +1659,8 @@ void definePrimitives() {
     if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
 }
 
-void initializeDictionary() {
-    latestDefinition = dictionary - 1;
-    for (auto word = dictionary; word < dictionaryLimit; ++word) {
-        word->reset();
-    }
-
+void initializeDefinitions() {
+    definitions.clear();
     definePrimitives();
 }
 
@@ -1671,7 +1679,7 @@ extern "C" void cxxforthReset() {
     std::memset(dataSpace, 0, sizeof(dataSpace));
     dataPointer = dataSpace;
 
-    initializeDictionary();
+    initializeDefinitions();
 }
 
 extern "C" int cxxforthRun(int argc, const char** argv) {
