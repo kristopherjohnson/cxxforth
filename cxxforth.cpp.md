@@ -136,7 +136,7 @@ the `cxxforthconfig.h` file produced by the CMake build.
 
 cxxforht can use the GNU Readline library for user input if it is available.
 
-The Cmake build will detect whether the library is available, and if so define
+The CMake build will detect whether the library is available, and if so define
 `CXXFORTH_USE_READLINE`.  However, you may not want to link your executable
 with GNU Readline due to its licensing terms.  You can pass
 `-DCXXFORTH_DISABLE_READLINE=ON` to `cmake` to prevent it from searching for
@@ -1494,6 +1494,26 @@ of the Forth text interpreter.
                             throw AbortException(std::string("unable to parse number: ") + std::string(caddr, length));
                         }
                     }
+                    else if ((length > 1) && (*caddr == '-') && isValidDigit(static_cast<Char>(*(caddr + 1)))) {
+                        push(0);
+                        push(CELL(caddr + 1));
+                        push(length - 1);
+                        parseNumber();
+    
+                        auto remainingLength = SIZE_T(*dTop); pop();
+                        pop(); // Drop the address
+                        if (remainingLength == 0) {
+                            // OK, the number is on the top of the stack.
+                            negate();
+                            if (isCompiling) {
+                                data(CELL(doLiteralXt));
+                                data(*dTop); pop();
+                            }
+                        }
+                        else {
+                            throw AbortException(std::string("unable to parse negative number: ") + std::string(caddr, length));
+                        }
+                    }
                     else {
                         throw AbortException(std::string("unrecognized word: ") + std::string(caddr, length));
                     }
@@ -1526,9 +1546,17 @@ message, resets the stacks, and continues.
 
 If end-of-input occurs, then it exits the loop and calls `CR` and `BYE`.
 
+If `QUIT` is called from a word called by `QUIT`, control returns to the
+top-level loop.
+
     
     // QUIT ( -- )
     void quit() {
+        static bool alreadyRunning = false;
+        if (alreadyRunning)
+            abort();
+        alreadyRunning = true;
+    
         resetRStack();
         isCompiling = false;
     
