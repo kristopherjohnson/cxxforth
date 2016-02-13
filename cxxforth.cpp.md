@@ -344,16 +344,16 @@ compiling or executing.  Rather than looking them up in the dictionary as
 needed, we'll cache their values.
 
     
-    const Definition* doLiteralXt = nullptr;
-    const Definition* setDoesXt = nullptr;
-    const Definition* exitXt      = nullptr;
+    Definition* doLiteralXt = nullptr;
+    Definition* setDoesXt   = nullptr;
+    Definition* exitXt      = nullptr;
     
 
 We need a flag to track whether we are in interpreting or compiling state.
 This corresponds to Forth's `STATE` variable.
 
     
-    Cell isCompiling = True;
+    Cell isCompiling = False;
     
 
 We provide a variable that controls the numeric base used for conversion
@@ -1239,9 +1239,15 @@ Compilation
     }
     
     // IMMEDIATE ( -- )
-    void immediate() {
-        lastDefinition().toggleImmediate();
-    }
+    //
+    // Note: Unlike ANS Forth, our IMMEDIATE toggles the immediacy bit of the most
+    // recent definition, rather than always setting it true.
+    void immediate() { lastDefinition().toggleImmediate(); }
+    
+    // HIDDEN ( -- )
+    // Not an ANS Forth word.
+    // Toggles the hidden bit of the ost recent definition.
+    void hidden() { lastDefinition().toggleHidden(); }
     
     void defineCodeWord(const char* name, Code code) {
         alignDataPointer();
@@ -1305,7 +1311,7 @@ Compilation
     // WORDS ( -- )
     void words() {
         std::for_each(definitions.rbegin(), definitions.rend(), [](auto& word) {
-            std::cout << word.name << " ";
+            if (!word.isHidden()) std::cout << word.name << " ";
         });
     }
     
@@ -1313,7 +1319,8 @@ Compilation
 Outer Interpreter
 -----------------
 
-See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description of the Forth text interpreter.
+See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description
+of the Forth text interpreter.
 
 [dpans_3_4]: http://forth.sourceforge.net/std/dpans/dpans3.htm#3.4 "3.4 The Forth text interpreter"
 
@@ -1463,10 +1470,11 @@ If end-of-input occurs, then it exits the loop and calls `CR` and `BYE`.
             catch (const AbortException& abortEx) {
                 std::string msg(abortEx.what());
                 if (msg.length() > 0) {
-                    std::cout << "<<< Error: " << msg << " >>>";
+                    std::cout << "<<< Error: " << msg << " >>>" << std::endl;
                 }
                 resetDStack();
                 resetRStack();
+                isCompiling = false;
             }
     
             prompt();
@@ -1474,6 +1482,24 @@ If end-of-input occurs, then it exits the loop and calls `CR` and `BYE`.
     
         cr();
         bye();
+    }
+    
+    // EVALUATE ( i*x c-addr u -- j*x )
+    void evaluate() {
+        REQUIRE_DSTACK_DEPTH(2, "EVALUATE");
+    
+        auto length = static_cast<std::size_t>(*dTop); pop();
+        auto caddr = CHARPTR(*dTop); pop();
+    
+        auto savedInput = std::move(inputBuffer);
+        auto savedOffset = inputOffset;
+    
+        inputBuffer = std::string(caddr, length);
+        inputOffset = 0;
+        interpret();
+    
+        inputBuffer = std::move(savedInput);
+        inputOffset = savedOffset;
     }
     
 
@@ -1546,11 +1572,13 @@ working system.
             {"DROP",          drop},
             {"DUP",           dup},
             {"EMIT",          emit},
+            {"EVALUATE",      evaluate},
             {"EXECUTE",       execute},
             {"EXIT",          exit},
             {"FALSE",         pushFalse},
             {"FIND",          find},
             {"HERE",          here},
+            {"HIDDEN",        hidden},
             {"IMMEDIATE",     immediate},
             {"INTERPRET",     interpret},
             {"INVERT",        invert},
@@ -1587,17 +1615,36 @@ working system.
     
         doLiteralXt = findDefinition("(literal)");
         if (doLiteralXt == nullptr) throw std::runtime_error("Can't find (literal) in kernel dictionary");
+        doLiteralXt->toggleHidden();
         
         setDoesXt = findDefinition("(does)");
         if (setDoesXt == nullptr) throw std::runtime_error("Can't find (does) in kernel dictionary");
+        setDoesXt->toggleHidden();
         
         exitXt = findDefinition("EXIT");
         if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
     }
     
+    void defineWords() {
+        static const char* lines[] = {
+            ": VARIABLE  CREATE 0 , ;",
+            ": CONSTANT  CREATE ,  DOES> @ ;"
+        };
+        static std::size_t lineCount = sizeof(lines) / sizeof(lines[0]);
+        for (std::size_t i = 0; i < lineCount; ++i) {
+            auto line = lines[i];
+            auto length = std::strlen(line);
+            // std::cerr << "Init: " << line << std::endl;
+            push(CELL(line));
+            push(CELL(length));
+            evaluate();
+        } 
+    }
+    
     void initializeDefinitions() {
         definitions.clear();
         definePrimitives();
+        defineWords();
     }
     
     } // end anonymous namespace
