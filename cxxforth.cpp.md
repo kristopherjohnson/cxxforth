@@ -206,8 +206,8 @@ so we need to be sure to use these constants for all Forth words that return a
 boolean flag.
 
     
-    constexpr auto True = static_cast<Cell>(-1);
-    constexpr auto False = static_cast<Cell>(0);
+    constexpr Cell False{0};
+    constexpr Cell True{~False};
     
 
 Our first big difference from most traditional Forth implementations is how
@@ -240,6 +240,7 @@ of the `Definition` that was most recently executed.  This can be used by
     
     struct Definition {
         Code        code      = nullptr;
+        AAddr       does      = nullptr;
         AAddr       parameter = nullptr;
         Cell        flags     = 0;   
         std::string name;
@@ -280,13 +281,6 @@ of the `Definition` that was most recently executed.  This can be used by
     
         void setImmediate(bool immediate) {
             flags = immediate ? (flags | FlagImmediate) : (flags & ~FlagImmediate);
-        }
-    
-        void reset() {
-            code = nullptr;
-            parameter = nullptr;
-            flags = 0;
-            name.clear();
         }
     };
     
@@ -345,12 +339,13 @@ We have to define the static `executingWord` member we declared in
     const Definition* Definition::executingWord = nullptr;
     
 
-There are a couple of special words whose addresses we will use frequently when
+There are a few special words whose addresses we will use frequently when
 compiling or executing.  Rather than looking them up in the dictionary as
 needed, we'll cache their values.
 
     
     const Definition* doLiteralXt = nullptr;
+    const Definition* setDoesXt = nullptr;
     const Definition* exitXt      = nullptr;
     
 
@@ -769,12 +764,24 @@ space pointer.
         dataPointer += CellSize;
     }
     
+    // , ( x -- )
+    void comma() {
+        auto value = *dTop; pop();
+        data(value);
+    }
+    
     // Store a char to data space.
     void cdata(Cell x) {
         REQUIRE_VALID_HERE("C,");
         REQUIRE_DATASPACE_AVAILABLE(1, "C,");
         *dataPointer = static_cast<Char>(x);
         dataPointer += 1;
+    }
+    
+    // C, ( char -- )
+    void cComma() {
+        auto value = *dTop; pop();
+        cdata(value);
     }
     
     // UNUSED ( -- u )
@@ -1128,7 +1135,7 @@ colon definition that called the current word.
     
         auto defn = Definition::executingWord;
     
-        next = reinterpret_cast<Definition**>(defn->parameter);
+        next = reinterpret_cast<Definition**>(defn->does);
         while (*next != exitXt) {
             (*(next++))->execute();
         }
@@ -1174,10 +1181,6 @@ Compilation
         push(CELL(&isCompiling));
     }
     
-    // (create) ( -- a-addr )
-    // Not an ANS Forth word.
-    // This function performs the execution-time semantics of a CREATEd word.
-    // It puts the word's parameter-field address on the stack.
     void doCreate() {
         auto defn = Definition::executingWord;
         REQUIRE_DSTACK_AVAILABLE(1, defn->name.c_str());
@@ -1196,7 +1199,7 @@ Compilation
     
         Definition defn;
         defn.code = doCreate;
-        defn.parameter = AADDR(dataPointer);
+        defn.parameter = defn.does = AADDR(dataPointer);
         defn.name = std::string(caddr, length);
         definitions.emplace_back(std::move(defn));
     }
@@ -1209,6 +1212,23 @@ Compilation
         auto& latest = lastDefinition();
         latest.code = doColon;
         latest.setHidden(true);
+    }
+    
+    void doDoes() {
+        doCreate();
+        doColon();
+    }
+    
+    void setDoes() {
+        auto& latest = lastDefinition();
+        latest.code = doDoes;
+        latest.does = AADDR(next) + 1;
+    }
+    
+    // DOES>
+    void does() {
+        data(CELL(setDoesXt));
+        data(CELL(exitXt));
     }
     
     // ; ( C: colon-sys -- )
@@ -1228,7 +1248,7 @@ Compilation
     
         Definition defn;
         defn.code = code;
-        defn.parameter = AADDR(dataPointer);
+        defn.parameter = defn.does = AADDR(dataPointer);
         defn.name = name;
         definitions.emplace_back(std::move(defn));
     }
@@ -1358,10 +1378,12 @@ See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description o
             
             if (found) {
                 auto xt = reinterpret_cast<Definition*>(*dTop); pop();
-                if (isCompiling && !xt->isImmediate())
+                if (isCompiling && !xt->isImmediate()) {
                     data(CELL(xt));
-                else
+                }
+                else {
                     xt->execute();
+                }
             }
             else {
                 // find() left the counted string on the stack.
@@ -1471,6 +1493,7 @@ working system.
             // name           code            
             // ------------------------------
             {";",             semicolon},
+            {"DOES>",         does},
         };
         for (auto& w: immediateCodeWords) {
             defineCodeWord(w.name, w.code);
@@ -1485,9 +1508,11 @@ working system.
             // ------------------------------
             {"!",             store},
             {"#ARG",          argCount},
+            {"(does)",        setDoes},
             {"(literal)",     doLiteral},
             {"*",             star},
             {"+",             plus},
+            {",",             comma},
             {"-",             minus},
             {".",             dot},
             {".S",            dotS},
@@ -1511,6 +1536,7 @@ working system.
             {"BL",            bl},
             {"BYE",           bye},
             {"C!",            cstore},
+            {"C,",            cComma},
             {"C@",            cfetch},
             {"CELLS",         cells},
             {"COUNT",         count},
@@ -1561,6 +1587,9 @@ working system.
     
         doLiteralXt = findDefinition("(literal)");
         if (doLiteralXt == nullptr) throw std::runtime_error("Can't find (literal) in kernel dictionary");
+        
+        setDoesXt = findDefinition("(does)");
+        if (setDoesXt == nullptr) throw std::runtime_error("Can't find (does) in kernel dictionary");
         
         exitXt = findDefinition("EXIT");
         if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
