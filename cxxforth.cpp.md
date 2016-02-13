@@ -155,7 +155,7 @@ in case they have not been defined.
     #define CXXFORTH_RSTACK_COUNT (256)
     #endif
     
-  
+
 We'll start by defining some basic types.  A `Cell` is the basic Forth type.
 We define our cell using the C++ `uintptr_t` type to ensure it is large enough
 to hold an address.  This generally means that it will be a 32-bit value on
@@ -242,7 +242,7 @@ of the `Definition` that was most recently executed.  This can be used by
         Code        code      = nullptr;
         AAddr       does      = nullptr;
         AAddr       parameter = nullptr;
-        Cell        flags     = 0;   
+        Cell        flags     = 0;
         std::string name;
     
         static constexpr Cell FlagHidden    = (1 << 1);
@@ -460,7 +460,7 @@ using a C++ exception to return control to the top-level interpreter.
         AbortException(const char* msg): std::runtime_error(msg) {}
     };
     
-    // ABORT ( i*x -- ) ( R: j*x -- ) 
+    // ABORT ( i*x -- ) ( R: j*x -- )
     void abort() {
         throw AbortException("");
     }
@@ -619,11 +619,11 @@ are supposed to do.
     // ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
     void roll() {
         REQUIRE_DSTACK_DEPTH(1, "ROLL");
-        auto index = *dTop; pop();
-        if (index > 0) {
-            REQUIRE_DSTACK_DEPTH(index + 1, "ROLL");
-            auto x = *(dTop - index - 1);
-            std::memmove(dTop - index - 1, dTop - index, index * sizeof(Cell));
+        auto n = *dTop; pop();
+        if (n > 0) {
+            REQUIRE_DSTACK_DEPTH(n + 1, "ROLL");
+            auto x = *(dTop - n);
+            std::memmove(dTop - n, dTop - n + 1, n * sizeof(Cell));
             *dTop = x;
         }
     }
@@ -709,7 +709,7 @@ values in data space.
         push(count);
     }
     
- 
+
 Now we will define the Forth words for accessing and manipulating the data
 space pointer.
 
@@ -876,11 +876,11 @@ character after the character data, but we aren't going to worry about this
 obsolescent requirement.
 
     
-    // WORD ( char "<chars>ccc<char>" -- c-addr ) 
+    // WORD ( char "<chars>ccc<char>" -- c-addr )
     void word() {
         REQUIRE_DSTACK_DEPTH(1, "WORD");
         auto delim = static_cast<char>(*dTop);
-        
+    
         wordBuffer.clear();
         wordBuffer.push_back(0);  // First char of buffer is length.
     
@@ -1164,7 +1164,7 @@ colon definition that called the current word.
         defn->execute();
     }
     
- 
+
 Compilation
 -----------
 
@@ -1341,7 +1341,7 @@ of the Forth text interpreter.
             return c - 'a' + 10;
         else if (c >= 'A')
             return c - 'A' + 10;
-        else 
+        else
             return c - '0';
     }
     
@@ -1350,7 +1350,7 @@ of the Forth text interpreter.
     // This word is similar to ANS Forth's >NUMBER, but provides a single-cell result.
     void parseNumber() {
         REQUIRE_DSTACK_DEPTH(3, "PARSE-NUMBER");
-        
+    
         auto length = SIZE_T(*dTop);
         auto caddr = CADDR(*(dTop - 1));
         auto value = *(dTop - 2);
@@ -1367,7 +1367,7 @@ of the Forth text interpreter.
                 break;
             }
         }
-        
+    
         *(dTop - 2) = value;
         *(dTop - 1) = CELL(caddr + i);
         *dTop = length - i;
@@ -1381,8 +1381,8 @@ of the Forth text interpreter.
         while (inputOffset < inputSize) {
             bl(); word(); find();
     
-            auto found = static_cast<int>(*dTop); pop();  
-            
+            auto found = static_cast<int>(*dTop); pop();
+    
             if (found) {
                 auto xt = reinterpret_cast<Definition*>(*dTop); pop();
                 if (isCompiling && !xt->isImmediate()) {
@@ -1398,7 +1398,7 @@ of the Forth text interpreter.
     
                 count();
                 auto length = SIZE_T(*dTop); pop();
-                auto caddr = CHARPTR(*dTop); pop(); 
+                auto caddr = CHARPTR(*dTop); pop();
     
                 if (length > 0) {
                     if (isValidDigit(static_cast<Char>(*caddr))) {
@@ -1516,7 +1516,7 @@ working system.
             const char* name;
             Code code;
         } immediateCodeWords[] = {
-            // name           code            
+            // name           code
             // ------------------------------
             {";",             semicolon},
             {"DOES>",         does},
@@ -1526,12 +1526,12 @@ working system.
             defineCodeWord(w.name, w.code);
             immediate();
         }
-        
+    
         static struct {
             const char* name;
             Code code;
         } codeWords[] = {
-            // name           code            
+            // name           code
             // ------------------------------
             {"!",             store},
             {"#ARG",          argCount},
@@ -1616,19 +1616,56 @@ working system.
         doLiteralXt = findDefinition("(literal)");
         if (doLiteralXt == nullptr) throw std::runtime_error("Can't find (literal) in kernel dictionary");
         doLiteralXt->toggleHidden();
-        
+    
         setDoesXt = findDefinition("(does)");
         if (setDoesXt == nullptr) throw std::runtime_error("Can't find (does) in kernel dictionary");
         setDoesXt->toggleHidden();
-        
+    
         exitXt = findDefinition("EXIT");
         if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
     }
     
-    void defineWords() {
+    void defineBuiltins() {
         static const char* lines[] = {
+    
+            ": ROT    2 ROLL ;",
+            ": 2DROP  DROP DROP ;",
+            ": 2DUP   OVER OVER ;",
+            ": 2OVER  3 PICK 3 PICK ;",
+            ": 2SWAP  3 ROLL 3 ROLL ;",
+            ": 2>R    SWAP >R >R ;",
+            ": 2R>    R> R> SWAP ;",
+            ": 2R@    R> R> 2DUP >R >R SWAP ;",
+    
+            ": 1+  1 + ;",
+            ": 1-  1 - ;",
+            ": +!  DUP >R @ + R> ! ;",
+    
+            ": CELL+  1 CELLS + ;",
+            ": CHAR+  1+ ;",
+            ": CHARS  ;",
+    
+            ": <>   = INVERT ;",
+            ": 0<   0 < ;",
+            ": 0>   0 > ;",
+            ": 0=   0 = ;",
+            ": 0<>  0= INVERT ;",
+    
+            ": 2!  SWAP OVER ! CELL+ ! ;",
+    
+            ": 2*  1 LSHIFT ;",
+            ": 2/  1 RSHIFT ;",
+    
             ": VARIABLE  CREATE 0 , ;",
-            ": CONSTANT  CREATE ,  DOES> @ ;"
+            ": ?         @ . ;",
+    
+            ": CONSTANT   CREATE ,    DOES>  @ ;",
+            ": 2CONSTANT  CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
+    
+            ": DECIMAL  10 BASE ! ;",
+            ": HEX      16 BASE ! ;",
+    
+            ": '  BL WORD FIND DROP ;",
         };
         static std::size_t lineCount = sizeof(lines) / sizeof(lines[0]);
         for (std::size_t i = 0; i < lineCount; ++i) {
@@ -1638,13 +1675,13 @@ working system.
             push(CELL(line));
             push(CELL(length));
             evaluate();
-        } 
+        }
     }
     
     void initializeDefinitions() {
         definitions.clear();
         definePrimitives();
-        defineWords();
+        defineBuiltins();
     }
     
     } // end anonymous namespace
