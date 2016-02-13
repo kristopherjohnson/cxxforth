@@ -1487,11 +1487,12 @@ Cell digitValue(Char c) {
         return c - '0';
 }
 
-// >SNUMBER ( u0 c-addr1 u1 -- u c-addr2 u2 )
+// >UNUM ( u0 c-addr1 u1 -- u c-addr2 u2 )
 // Not an ANS Forth word.
+//
 // This word is similar to ANS Forth's >NUMBER, but provides a single-cell result.
-void parseNumber() {
-    REQUIRE_DSTACK_DEPTH(3, ">SNUMBER");
+void parseUnsignedNumber() {
+    REQUIRE_DSTACK_DEPTH(3, ">UNUM");
 
     auto length = SIZE_T(*dTop);
     auto caddr = CADDR(*(dTop - 1));
@@ -1513,6 +1514,28 @@ void parseNumber() {
     *(dTop - 2) = value;
     *(dTop - 1) = CELL(caddr + i);
     *dTop = length - i;
+}
+
+// >NUM ( n c-addr1 u1 -- n c-addr2 u2 )
+// Not an ANS Forth word.
+// 
+// Similar to >UNUM, but looks for a '-' character at the beginning, and
+// negates the result if found.
+void parseSignedNumber() {
+    REQUIRE_DSTACK_DEPTH(3, ">NUM");
+
+    auto length = SIZE_T(*dTop);
+    auto caddr = CHARPTR(*(dTop - 1));
+    
+    if (length > 1 && *caddr == '-') {
+        *dTop = static_cast<Cell>(length - 1);
+        *(dTop - 1) = CELL(caddr + 1);
+        parseUnsignedNumber();
+        *(dTop - 2) = static_cast<Cell>(SCell(-1) * static_cast<SCell>(*(dTop - 2)));
+    }
+    else {
+        parseUnsignedNumber();
+    }
 }
 
 // INTERPRET ( i*x -- j*x )
@@ -1543,43 +1566,20 @@ void interpret() {
             auto caddr = CHARPTR(*dTop); pop();
 
             if (length > 0) {
-                if (isValidDigit(static_cast<Char>(*caddr))) {
-                    push(0);
-                    push(CELL(caddr));
-                    push(length);
-                    parseNumber();
+                push(0);
+                push(CELL(caddr));
+                push(length);
+                parseSignedNumber();
 
-                    auto remainingLength = SIZE_T(*dTop); pop();
-                    pop(); // Drop the address
-                    if (remainingLength == 0) {
-                        // OK, the number is on the top of the stack.
-                        if (isCompiling) {
-                            data(CELL(doLiteralXt));
-                            data(*dTop); pop();
-                        }
-                    }
-                    else {
-                        throw AbortException(std::string("unable to parse number: ") + std::string(caddr, length));
-                    }
-                }
-                else if ((length > 1) && (*caddr == '-') && isValidDigit(static_cast<Char>(*(caddr + 1)))) {
-                    push(0);
-                    push(CELL(caddr + 1));
-                    push(length - 1);
-                    parseNumber();
+                auto remainingLength = SIZE_T(*dTop); pop();
+                pop();
 
-                    auto remainingLength = SIZE_T(*dTop); pop();
-                    pop(); // Drop the address
-                    if (remainingLength == 0) {
-                        // OK, the number is on the top of the stack.
-                        negate();
-                        if (isCompiling) {
-                            data(CELL(doLiteralXt));
-                            data(*dTop); pop();
-                        }
-                    }
-                    else {
-                        throw AbortException(std::string("unable to parse negative number: ") + std::string(caddr, length));
+                // Note: The parsed number is now on the top of the stack.
+
+                if (remainingLength == 0) {
+                    if (isCompiling) {
+                        data(CELL(doLiteralXt));
+                        data(*dTop); pop();
                     }
                 }
                 else {
@@ -1725,7 +1725,9 @@ void definePrimitives() {
         {"=",             equals},
         {">",             greaterThan},
         {">IN",           in},
+        {">NUM",          parseSignedNumber},
         {">R",            toR},
+        {">UNUM",         parseUnsignedNumber},
         {"@",             fetch},
         {"ABORT",         abort},
         {"ABORT-MESSAGE", abortMessage},
@@ -1763,7 +1765,6 @@ void definePrimitives() {
         {"OR",            bitwiseOr},
         {"OVER",          over},
         {"PARSE",         parse},
-        {">SNUMBER",      parseNumber},
         {"PICK",          pick},
         {"PROMPT",        prompt},
         {"QUIT",          quit},
