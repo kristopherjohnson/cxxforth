@@ -236,26 +236,21 @@ constexpr Cell True = ~False;
 
 /****
 
-Our first big difference from most traditional Forth implementations is how
+Our first big difference from traditional Forth implementations is how
 we'll store the word definitions for our Forth dictionary.  Traditional Forths
 intersperse the word names in the shared data space along with code and data,
-using a linked list to navigate through them.  We are going to just have an
-array of `Definition` structs.
+using a linked list to navigate through them.  We are going to just use an
+`std::list` of `Definition` structs, outside of the data space.
 
 One of the members of `Definition` is a `std::string` to hold the name, so we
 won't need to worry about managing the memory for that variable-length field.
-We can use its `data()` function when we need a pointer to the raw character
-data.
 
 A `Definition` also needs a `code` field that points to the native code
-associated with the word, a `parameter` field that points to the data-space
-elements associated with the word, and some bit flags to keep track of whether
-the word is `IMMEDIATE` and/or `HIDDEN`.  We will explore the use of these
-fields later when we talk about the interpreter.
-
-Note that the `code` field is the first member of the `Definition` struct.
-This means that the address of a `Definition` is also the address of a code
-field.  We will use such an address as our Forth _execution token_ (xt).
+associated with the word, a `does` field pointing to associated Forth
+instructions, a `parameter` field that points to associated data-space
+elements, and some bit flags to keep track of whether the word is `IMMEDIATE`
+and/or `HIDDEN`.  We will explore the use of these fields later when we talk
+about the interpreters.
 
 `Definition` has a static field `executingWord` that contains the address
 of the `Definition` that was most recently executed.  This can be used by
@@ -278,38 +273,39 @@ struct Definition {
     static const Definition* executingWord;
 
     void execute() const {
-        auto previousValue = executingWord;
+        auto saved = executingWord;
         executingWord = this;
 
         code();
 
-        executingWord = previousValue;
+        executingWord = saved;
     }
 
-    const char* nameAddress() const {
-        return name.data();
-    }
+    bool isHidden() const    { return (flags & FlagHidden) != 0; }
 
-    std::size_t nameLength() const {
-        return name.length();
-    }
+    void toggleHidden()      { flags ^= FlagHidden; }
 
-    bool isHidden() const {
-        return (flags & FlagHidden) != 0;
-    }
+    bool isImmediate() const { return (flags & FlagImmediate) != 0; }
 
-    void toggleHidden() {
-        flags ^= FlagHidden;
-    }
-
-    bool isImmediate() const {
-        return (flags & FlagImmediate) != 0;
-    }
-
-    void toggleImmediate() {
-        flags ^= FlagImmediate;
-    }
+    void toggleImmediate()   { flags ^= FlagImmediate; }
 };
+
+/****
+
+We will use a pointer to a `Definition` as our Forth _execution token_ (xt).
+
+In many traditional Forths, a "code field address" (CFA) is used as the
+execution token.  It so happens that our `Definition` struct has a `code` field
+as its first member, so the address of a `Definition` is also the address of a
+code field, so in that sense we are following tradition.  But that detail is
+irrelevant: we could move our code field elswehere in the struct and everything
+would still work.
+
+****/
+
+using Xt = Definition*;
+
+#define XT(x) reinterpret_cast<Xt>(x)
 
 /****
 
@@ -364,7 +360,7 @@ executed.
 
 ****/
 
-Definition** next = nullptr;
+Xt* next = nullptr;
 
 /****
 
@@ -383,9 +379,9 @@ needed, we'll cache their values.
 
 ****/
 
-Definition* doLiteralXt = nullptr;
-Definition* setDoesXt   = nullptr;
-Definition* exitXt      = nullptr;
+Xt doLiteralXt = nullptr;
+Xt setDoesXt   = nullptr;
+Xt exitXt      = nullptr;
 
 /****
 
@@ -1266,12 +1262,12 @@ void doColon() {
 
     auto defn = Definition::executingWord;
 
-    next = reinterpret_cast<Definition**>(defn->does);
+    next = reinterpret_cast<Xt*>(defn->does);
     while (*next != exitXt) {
         (*(next++))->execute();
     }
 
-    next = reinterpret_cast<Definition**>(*rTop); rpop();
+    next = reinterpret_cast<Xt*>(*rTop); rpop();
 }
 
 // EXIT ( -- ) ( R: nest-sys -- )
@@ -1298,7 +1294,7 @@ void literal() {
 // EXECUTE ( i*x xt -- j*x )
 void execute() {
     REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
-    auto defn = reinterpret_cast<Definition*>(*dTop); pop();
+    auto defn = XT(*dTop); pop();
     defn->execute();
 }
 
@@ -1408,7 +1404,7 @@ bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
     return true;
 }
 
-Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
+Xt findDefinition(CAddr nameToFind, Cell nameLength) {
     if (nameLength == 0)
         return nullptr;
 
@@ -1427,7 +1423,7 @@ Definition* findDefinition(CAddr nameToFind, Cell nameLength) {
     return nullptr;
 }
 
-Definition* findDefinition(const std::string& name) {
+Xt findDefinition(const std::string& name) {
     return findDefinition(CADDR(const_cast<char*>(name.data())), static_cast<Cell>(name.length()));
 }
 
@@ -1446,6 +1442,25 @@ void find() {
         *dTop = CELL(word);
         push(word->isImmediate() ? 1 : Cell(-1));
     }
+}
+
+// >BODY ( xt -- a-addr )
+void toBody() {
+    REQUIRE_DSTACK_DEPTH(1, ">BODY");
+    auto xt = XT(*dTop);
+    *dTop = CELL(xt->parameter);
+}
+
+// XT>NAME ( xt -- c-addr u )
+// Not an ANS Forth word.
+// Gives the name associated with an xt.
+void xtToName() {
+    REQUIRE_DSTACK_DEPTH(1, "XT>NAME");
+    REQUIRE_DSTACK_AVAILABLE(1, "XT>NAME");
+    auto xt = XT(*dTop);
+    auto& name = xt->name;
+    *dTop = CELL(name.data());
+    push(static_cast<Cell>(name.length()));
 }
 
 // WORDS ( -- )
@@ -1549,7 +1564,7 @@ void interpret() {
         auto found = static_cast<int>(*dTop); pop();
 
         if (found) {
-            auto xt = reinterpret_cast<Definition*>(*dTop); pop();
+            auto xt = XT(*dTop); pop();
             if (isCompiling && !xt->isImmediate()) {
                 data(CELL(xt));
             }
@@ -1724,6 +1739,7 @@ void definePrimitives() {
         {"<",             lessThan},
         {"=",             equals},
         {">",             greaterThan},
+        {">BODY",         toBody},
         {">IN",           in},
         {">NUM",          parseSignedNumber},
         {">R",            toR},
@@ -1784,6 +1800,7 @@ void definePrimitives() {
         {"UTCTIME&DATE",  utcTimeAndDate},
         {"WORD",          word},
         {"WORDS",         words},
+        {"XT>NAME",       xtToName},
         {"XOR",           bitwiseXor},
     };
     for (auto& w: codeWords) {
