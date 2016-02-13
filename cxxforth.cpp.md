@@ -1520,6 +1520,7 @@ working system.
             // ------------------------------
             {";",             semicolon},
             {"DOES>",         does},
+            {"IMMEDIATE",     immediate},
         };
         for (auto& w: immediateCodeWords) {
             defineCodeWord(w.name, w.code);
@@ -1579,7 +1580,6 @@ working system.
             {"FIND",          find},
             {"HERE",          here},
             {"HIDDEN",        hidden},
-            {"IMMEDIATE",     immediate},
             {"INTERPRET",     interpret},
             {"INVERT",        invert},
             {"LSHIFT",        lshift},
