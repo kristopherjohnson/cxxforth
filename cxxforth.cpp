@@ -746,7 +746,6 @@ void cstore() {
 void cfetch() {
     REQUIRE_DSTACK_DEPTH(1, "C@");
     auto caddr = CADDR(*dTop);
-    REQUIRE_ALIGNED(caddr, "C@");
     *dTop = static_cast<Cell>(*caddr);
 }
 
@@ -1775,9 +1774,12 @@ void defineBuiltins() {
         ": DECIMAL  10 BASE ! ;",
         ": HEX      16 BASE ! ;",
 
-        ": '  BL WORD FIND DROP ;",
+        ": '        BL WORD FIND DROP ;",
+        ": POSTPONE ' , ; IMMEDIATE",
+        ": [']      ' POSTPONE LITERAL ; IMMEDIATE",
 
-        ": CHAR  BL WORD CELL+ C@ ;",
+        ": CHAR    BL WORD CHAR+ C@ ;",
+        ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
     };
     static std::size_t lineCount = sizeof(lines) / sizeof(lines[0]);
     for (std::size_t i = 0; i < lineCount; ++i) {
