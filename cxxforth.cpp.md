@@ -134,6 +134,21 @@ the `cxxforthconfig.h` file produced by the CMake build.
     #include <thread>
     
 
+cxxforht can use the GNU Readline library for user input if it is available.
+
+The Cmake build will detect whether the library is available, and if so define
+`CXXFORTH_USE_READLINE`.  However, you may not want to link your executable
+with GNU Readline due to its licensing terms.  You can pass
+`-DCXXFORTH_DISABLE_READLINE=ON` to `cmake` to prevent it from searching for
+the library.
+
+    
+    #ifdef CXXFORTH_USE_READLINE
+    #include "readline/readline.h"
+    #include "readline/history.h"
+    #endif
+    
+
 We have a few macros to define the size of the Forth data space, the maximum
 numbers of cells on the data and return stacks, and the maximum number of word
 definitions in the dictionary.
@@ -853,9 +868,33 @@ using C++ iostream objects.
         push(CELL(&inputOffset));
     }
     
+
+`REFILL` reads a line from the user input device.  If successful, it puts the
+result into `inputBuffer`, sets `inputOffset` to 0, and pushes a `TRUE` flag
+onto the stack.  If not successful, it pushes a `FALSE` flag.
+
+We use GNU Readline if configured to do so.  Otherwise we use the C++
+`std::getline()` function.
+
+    
     // REFILL ( -- flag )
     void refill() {
         REQUIRE_DSTACK_AVAILABLE(1, "REFILL");
+    
+    #ifdef CXXFORTH_USE_READLINE
+        char* line = readline("");
+        if (line) {
+            inputBuffer = line;
+            inputOffset = 0;
+            if (*line)
+                add_history(line);
+            std::free(line);
+            pushTrue();
+        }
+        else {
+            pushFalse();
+        }
+    #else
         if (std::getline(std::cin, inputBuffer)) {
             inputOffset = 0;
             pushTrue();
@@ -863,6 +902,7 @@ using C++ iostream objects.
         else {
             pushFalse();
         }
+    #endif
     }
     
 
@@ -1711,7 +1751,7 @@ working system.
             ": [']      ' POSTPONE LITERAL ; IMMEDIATE",
     
             ": CHAR    BL WORD CHAR+ C@ ;",
-            ": [CHAR]  BL WORD CHAR+ C@ POSTPONE LITERAL ; IMMEDIATE",
+            ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
         };
         static std::size_t lineCount = sizeof(lines) / sizeof(lines[0]);
         for (std::size_t i = 0; i < lineCount; ++i) {

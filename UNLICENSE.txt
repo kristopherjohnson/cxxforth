@@ -1,3 +1,7 @@
+The file cmake_modules/FindReadline.cmake has its own licensing terms.
+The remaining files are released under the following terms:
+
+
 This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or
