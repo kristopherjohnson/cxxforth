@@ -4,10 +4,10 @@ project(cxxforth)
 add_executable(cxxforth cxxforth.cpp)
 add_executable(cpp2md   cpp2md.cpp)
 
-add_custom_target(cxxforth.cpp.md ALL build/cpp2md cxxforth.cpp cxxforth.cpp.md
+add_custom_target(README.md ALL build/cpp2md cxxforth.cpp README.md
     DEPENDS cxxforth.cpp cpp2md
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Generate cxxforth.cpp.md" VERBATIM
+    COMMENT "Generate README.md" VERBATIM
     SOURCES cxxforth.cpp
 )
 

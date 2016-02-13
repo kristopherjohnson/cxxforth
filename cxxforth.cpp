@@ -27,8 +27,6 @@ AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
 ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-For more information, please refer to <http://unlicense.org/>
-
 ----
 
 `cxxforth` is a simple implementation of a [Forth][forth] system in C++.  There
@@ -48,10 +46,8 @@ implementation written as a very readable tutorial, and we are going to copy
 its style for our higher-level implementation.  Our Forth kernel is written as
 C++ file with large comment blocks, and we have a utility, `cpp2md`, that will
 take that C++ file and convert it to a [Markdown][markdown] format document
-with nicely formatted commentary sections between the C++ code blocks.  If you
-are currently reading `cxxforth.cpp` online, consider reading the Markdown file
-[cxxforth.cpp.md](cxxforth.cpp.md) instead, as BitBucket or GitHub will
-automtically display the Markdown file as formatted HTML.
+named "README.md" with nicely formatted commentary sections between the C++
+code blocks.
 
 As in other Forth systems, the basic design of this Forth is to create a small
 kernel in native code (C++, in our case), and then implement the rest of the
