@@ -386,6 +386,13 @@ convert it to a real string.
     std::string wordBuffer;
     
 
+We need a buffer to store the result of the Forth `PARSE` word.  Unlike `WORD`,
+we won't need to store the count at the beginning of the buffer.
+
+    
+    std::string parseBuffer;
+    
+
 We store the `argc` and `argv` values passed to `main()`, for use by the Forth
 program.  These are made available by our non-standard `#ARG` and `ARG` Forth
 words.
@@ -902,6 +909,27 @@ obsolescent requirement.
         *dTop = CELL(wordBuffer.data());
     }
     
+    // PARSE ( char "ccc<char>" -- c-addr u )
+    void parse() {
+        REQUIRE_DSTACK_DEPTH(1, "PARSE");
+        REQUIRE_DSTACK_AVAILABLE(1, "PARSE");
+        
+        auto delim = static_cast<char>(*dTop);
+    
+        parseBuffer.clear();
+    
+        auto inputSize = inputBuffer.size();
+    
+        // Copy characters until we see the delimiter.
+        while (inputOffset < inputSize && inputBuffer[inputOffset] != delim) {
+            parseBuffer.push_back(inputBuffer[inputOffset]);
+            ++inputOffset;
+        }
+    
+        *dTop = CELL(parseBuffer.data());
+        push(static_cast<Cell>(parseBuffer.size()));
+    }
+    
 
 `BL` puts a space character on the stack.  It is often used as `BL WORD` to
 parse a space-delimited word.
@@ -1157,6 +1185,13 @@ colon definition that called the current word.
         ++next;
     }
     
+    // LITERAL Compilation: ( x -- )  Runtime: ( -- x )
+    void literal() {
+        REQUIRE_DSTACK_DEPTH(1, "LITERAL");
+        data(CELL(doLiteralXt));
+        data(*dTop); pop();
+    }
+    
     // EXECUTE ( i*x xt -- j*x )
     void execute() {
         REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
@@ -1345,11 +1380,11 @@ of the Forth text interpreter.
             return c - '0';
     }
     
-    // PARSE-NUMBER ( u0 c-addr1 u1 -- u c-addr2 u2 )
+    // >SNUMBER ( u0 c-addr1 u1 -- u c-addr2 u2 )
     // Not an ANS Forth word.
     // This word is similar to ANS Forth's >NUMBER, but provides a single-cell result.
     void parseNumber() {
-        REQUIRE_DSTACK_DEPTH(3, "PARSE-NUMBER");
+        REQUIRE_DSTACK_DEPTH(3, ">SNUMBER");
     
         auto length = SIZE_T(*dTop);
         auto caddr = CADDR(*(dTop - 1));
@@ -1521,6 +1556,7 @@ working system.
             {";",             semicolon},
             {"DOES>",         does},
             {"IMMEDIATE",     immediate},
+            {"LITERAL",       literal},
         };
         for (auto& w: immediateCodeWords) {
             defineCodeWord(w.name, w.code);
@@ -1587,7 +1623,8 @@ working system.
             {"NEGATE",        negate},
             {"OR",            bitwiseOr},
             {"OVER",          over},
-            {"PARSE-NUMBER",  parseNumber},
+            {"PARSE",         parse},
+            {">SNUMBER",      parseNumber},
             {"PICK",          pick},
             {"PROMPT",        prompt},
             {"QUIT",          quit},
@@ -1628,7 +1665,12 @@ working system.
     void defineBuiltins() {
         static const char* lines[] = {
     
+            ": [  FALSE STATE ! ; IMMEDIATE",
+            ": ]  TRUE STATE ! ;",
+    
             ": ROT    2 ROLL ;",
+            ": NIP    SWAP DROP ;",
+            ": TUCK   SWAP OVER ;",
             ": 2DROP  DROP DROP ;",
             ": 2DUP   OVER OVER ;",
             ": 2OVER  3 PICK 3 PICK ;",
@@ -1666,6 +1708,8 @@ working system.
             ": HEX      16 BASE ! ;",
     
             ": '  BL WORD FIND DROP ;",
+    
+            ": CHAR  BL WORD CELL+ C@ ;",
         };
         static std::size_t lineCount = sizeof(lines) / sizeof(lines[0]);
         for (std::size_t i = 0; i < lineCount; ++i) {
