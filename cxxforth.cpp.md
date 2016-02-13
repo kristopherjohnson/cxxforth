@@ -206,8 +206,8 @@ so we need to be sure to use these constants for all Forth words that return a
 boolean flag.
 
     
-    constexpr Cell False{0};
-    constexpr Cell True{~False};
+    constexpr Cell False = 0;
+    constexpr Cell True = ~False;
     
 
 Our first big difference from most traditional Forth implementations is how
@@ -271,16 +271,16 @@ of the `Definition` that was most recently executed.  This can be used by
             return (flags & FlagHidden) != 0;
         }
     
-        void setHidden(bool hidden) {
-            flags = hidden ? (flags | FlagHidden) : (flags & ~FlagHidden);
+        void toggleHidden() {
+            flags ^= FlagHidden;
         }
     
         bool isImmediate() const {
             return (flags & FlagImmediate) != 0;
         }
     
-        void setImmediate(bool immediate) {
-            flags = immediate ? (flags | FlagImmediate) : (flags & ~FlagImmediate);
+        void toggleImmediate() {
+            flags ^= FlagImmediate;
         }
     };
     
@@ -1211,7 +1211,7 @@ Compilation
     
         auto& latest = lastDefinition();
         latest.code = doColon;
-        latest.setHidden(true);
+        latest.toggleHidden();
     }
     
     void doDoes() {
@@ -1235,12 +1235,12 @@ Compilation
     void semicolon() {
         data(CELL(exitXt));
         isCompiling = false;
-        lastDefinition().setHidden(false);
+        lastDefinition().toggleHidden();
     }
     
     // IMMEDIATE ( -- )
     void immediate() {
-        lastDefinition().setImmediate(true);
+        lastDefinition().toggleImmediate();
     }
     
     void defineCodeWord(const char* name, Code code) {
