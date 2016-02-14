@@ -1011,6 +1011,12 @@ void parse() {
         ++inputOffset;
     }
 
+    if (inputOffset == inputSize)
+        throw AbortException(std::string("PARSE: Did not find expected delimiter \'" + std::string(1, delim) + "\'"));
+
+    // Skip over the delimiter
+    ++inputOffset;
+
     *dTop = CELL(parseBuffer.data());
     push(static_cast<Cell>(parseBuffer.size()));
 }
@@ -1159,16 +1165,20 @@ Define system and environmental primitives
 ****/
 
 // #ARG ( -- n )
-// Provide count of command-line arguments.
+//
 // Not an ANS Forth word.
+//
+// Provide count of command-line arguments.
 void argCount() {
     REQUIRE_DSTACK_AVAILABLE(1, "#ARG");
     push(commandLineArgCount);
 }
 
 // ARG ( n -- c-addr u )
-// Provide the Nth command-line argument.
+//
 // Not an ANS Forth word.`
+//
+// Provide the Nth command-line argument.
 void argAtIndex() {
     REQUIRE_DSTACK_DEPTH(1, "ARG");
     REQUIRE_DSTACK_AVAILABLE(1, "ARG");
@@ -1205,7 +1215,9 @@ void timeAndDate () {
 }
 
 // UTCTIME&DATE ( -- +n1 +n2 +n3 +n4 +n5 +n6 )
+//
 // Not an ANS Forth word.
+//
 // Like TIME&DATE, but returns UTC rather than local time.
 void utcTimeAndDate () {
     REQUIRE_DSTACK_AVAILABLE(6, "UTCTIME&DATE");
@@ -1272,8 +1284,10 @@ void exit() {
 }
 
 // (literal) ( -- x )
-// Compiled by LITERAL.
+//
 // Not an ANS Forth word.
+//
+// Compiled by LITERAL.
 void doLiteral() {
     REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
     push(CELL(*next));
@@ -1285,6 +1299,33 @@ void literal() {
     REQUIRE_DSTACK_DEPTH(1, "LITERAL");
     data(CELL(doLiteralXt));
     data(*dTop); pop();
+}
+
+// (branch) ( -- )
+// 
+// Not an ANS Forth word.
+//
+// Used by branching/looping constructs.  Unconditionally adds an offset to
+// `next`.  The offset is in the cell following the instruction.
+void branch() {
+    auto offset = reinterpret_cast<SCell>(*(next++));
+    next += offset;
+}
+
+// (0branch) ( flag -- )
+// 
+// Not an ANS Forth word.
+//
+// Used by branching/looping constructinos.  Adds an offset to `next` if
+// top-of-stack value is zero.  The offset is in the cell following the
+// instruction.
+void branchIfZero() {
+    REQUIRE_DSTACK_DEPTH(1, "(0branch)");
+    auto condition = *dTop; pop();
+    if (condition)
+        branch();
+    else
+        ++next;
 }
 
 // EXECUTE ( i*x xt -- j*x )
@@ -1377,7 +1418,9 @@ void semicolon() {
 void immediate() { lastDefinition().toggleImmediate(); }
 
 // HIDDEN ( -- )
+//
 // Not an ANS Forth word.
+//
 // Toggles the hidden bit of the ost recent definition.
 void hidden() { lastDefinition().toggleHidden(); }
 
@@ -1448,7 +1491,9 @@ void toBody() {
 }
 
 // XT>NAME ( xt -- c-addr u )
+//
 // Not an ANS Forth word.
+//
 // Gives the name associated with an xt.
 void xtToName() {
     REQUIRE_DSTACK_DEPTH(1, "XT>NAME");
@@ -1499,6 +1544,7 @@ Cell digitValue(Char c) {
 }
 
 // >UNUM ( u0 c-addr1 u1 -- u c-addr2 u2 )
+//
 // Not an ANS Forth word.
 //
 // This word is similar to ANS Forth's >NUMBER, but provides a single-cell result.
@@ -1528,6 +1574,7 @@ void parseUnsignedNumber() {
 }
 
 // >NUM ( n c-addr1 u1 -- n c-addr2 u2 )
+//
 // Not an ANS Forth word.
 // 
 // Similar to >UNUM, but looks for a '-' character at the beginning, and
@@ -1542,7 +1589,7 @@ void parseSignedNumber() {
         *dTop = static_cast<Cell>(length - 1);
         *(dTop - 1) = CELL(caddr + 1);
         parseUnsignedNumber();
-        *(dTop - 2) = static_cast<Cell>(SCell(-1) * static_cast<SCell>(*(dTop - 2)));
+        *(dTop - 2) = static_cast<Cell>(-static_cast<SCell>(*(dTop - 2)));
     }
     else {
         parseUnsignedNumber();
@@ -1550,7 +1597,9 @@ void parseSignedNumber() {
 }
 
 // INTERPRET ( i*x -- j*x )
+//
 // Not an ANS Forth word.
+//
 // Reads words from the input buffer and executes/compiles them.
 void interpret() {
     auto inputSize = inputBuffer.size();
@@ -1606,7 +1655,9 @@ void interpret() {
 }
 
 // PROMPT ( -- )
+//
 // Not an ANS Forth word.
+//
 // Displays "ok" prompt if in interpretation mode.
 void prompt() {
     if (!isCompiling) {
@@ -1721,6 +1772,8 @@ void definePrimitives() {
         // ------------------------------
         {"!",             store},
         {"#ARG",          argCount},
+        {"(0branch)",     branchIfZero},
+        {"(branch)",      branch},
         {"(does)",        setDoes},
         {"(literal)",     doLiteral},
         {"*",             star},
@@ -1815,63 +1868,105 @@ void definePrimitives() {
     if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
 }
 
+static const char* builtinDefinitions[] = {
+
+    ": ROT    2 ROLL ;",
+    ": NIP    SWAP DROP ;",
+    ": TUCK   SWAP OVER ;",
+    ": 2DROP  DROP DROP ;",
+    ": 2DUP   OVER OVER ;",
+    ": 2OVER  3 PICK 3 PICK ;",
+    ": 2SWAP  3 ROLL 3 ROLL ;",
+    ": 2>R    SWAP >R >R ;",
+    ": 2R>    R> R> SWAP ;",
+    ": 2R@    R> R> 2DUP >R >R SWAP ;",
+
+    ": 1+  1 + ;",
+    ": 1-  1 - ;",
+    ": +!  DUP >R @ + R> ! ;",
+
+    ": CELL+  1 CELLS + ;",
+    ": CHAR+  1+ ;",
+    ": CHARS  ;",
+
+    ": <>   = INVERT ;",
+    ": 0<   0 < ;",
+    ": 0>   0 > ;",
+    ": 0=   0 = ;",
+    ": 0<>  0= INVERT ;",
+
+    ": 2!  SWAP OVER ! CELL+ ! ;",
+
+    ": 2*  1 LSHIFT ;",
+    ": 2/  1 RSHIFT ;",
+
+    ": VARIABLE  CREATE 0 , ;",
+    ": ?         @ . ;",
+
+    ": CONSTANT   CREATE ,    DOES>  @ ;",
+    ": 2CONSTANT  CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
+
+    ": DECIMAL  10 BASE ! ;",
+    ": HEX      16 BASE ! ;",
+
+    ": [  FALSE STATE ! ; IMMEDIATE",
+    ": ]  TRUE STATE ! ;",
+
+    ": '        BL WORD FIND DROP ;",
+    ": POSTPONE ' , ; IMMEDIATE",
+    ": [']      ' POSTPONE LITERAL ; IMMEDIATE",
+
+    ": CHAR    BL WORD CHAR+ C@ ;",
+    ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
+
+    ": AHEAD ; IMMEDIATE",
+    ": IF    ; IMMEDIATE",
+    ": ELSE  ; IMMEDIATE",
+    ": THEN  ; IMMEDIATE",
+
+/****
+
+Comments
+--------
+
+There is a good reason that none of our Forth defintions above have had any
+stack diagrams or other comments: our Forth doesn't support comments yet.  We
+have to define words to implement comments.
+
+We will support two standard kinds of Forth comments:
+
+- If `\` (backslash) appears on a line, the rest of the line is ignored.
+- Text between `(` and `)` are ignored.
+
+Also, we will allow `#!` as a synonym for `\`, so that we can start a Forth
+script with something like this at the top of a Unix shell script:
+
+    #! /usr/local/bin cxxforth
+
+Note that a space is required after the `\`, `(`, or `#!` that starts a
+comment.  They are blank-delimited words just like every other Forth word.
+
+****/
+    ": \\  SOURCE NIP >IN ! ; IMMEDIATE",
+    ": #!  SOURCE NIP >IN ! ; IMMEDIATE",
+    ": (   [CHAR] ) PARSE 2DROP ; IMMEDIATE",
+};
+
+/****
+
+That is the end of our built-in Forth definitions.
+
+With the `builtinDefinitions` array filled, all we need to do is call
+`EVALUATE` on each line.
+
+****/
+
 void defineBuiltins() {
-    static const char* lines[] = {
-
-        ": [  FALSE STATE ! ; IMMEDIATE",
-        ": ]  TRUE STATE ! ;",
-
-        ": ROT    2 ROLL ;",
-        ": NIP    SWAP DROP ;",
-        ": TUCK   SWAP OVER ;",
-        ": 2DROP  DROP DROP ;",
-        ": 2DUP   OVER OVER ;",
-        ": 2OVER  3 PICK 3 PICK ;",
-        ": 2SWAP  3 ROLL 3 ROLL ;",
-        ": 2>R    SWAP >R >R ;",
-        ": 2R>    R> R> SWAP ;",
-        ": 2R@    R> R> 2DUP >R >R SWAP ;",
-
-        ": 1+  1 + ;",
-        ": 1-  1 - ;",
-        ": +!  DUP >R @ + R> ! ;",
-
-        ": CELL+  1 CELLS + ;",
-        ": CHAR+  1+ ;",
-        ": CHARS  ;",
-
-        ": <>   = INVERT ;",
-        ": 0<   0 < ;",
-        ": 0>   0 > ;",
-        ": 0=   0 = ;",
-        ": 0<>  0= INVERT ;",
-
-        ": 2!  SWAP OVER ! CELL+ ! ;",
-
-        ": 2*  1 LSHIFT ;",
-        ": 2/  1 RSHIFT ;",
-
-        ": VARIABLE  CREATE 0 , ;",
-        ": ?         @ . ;",
-
-        ": CONSTANT   CREATE ,    DOES>  @ ;",
-        ": 2CONSTANT  CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
-
-        ": DECIMAL  10 BASE ! ;",
-        ": HEX      16 BASE ! ;",
-
-        ": '        BL WORD FIND DROP ;",
-        ": POSTPONE ' , ; IMMEDIATE",
-        ": [']      ' POSTPONE LITERAL ; IMMEDIATE",
-
-        ": CHAR    BL WORD CHAR+ C@ ;",
-        ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
-    };
-    static std::size_t lineCount = sizeof(lines) / sizeof(lines[0]);
+    static std::size_t lineCount = sizeof(builtinDefinitions) / sizeof(builtinDefinitions[0]);
     for (std::size_t i = 0; i < lineCount; ++i) {
-        auto line = lines[i];
+        auto line = builtinDefinitions[i];
         auto length = std::strlen(line);
-        // std::cerr << "Init: " << line << std::endl;
+        // std::cerr << "Built-in: " << line << std::endl;
         push(CELL(line));
         push(CELL(length));
         evaluate();
