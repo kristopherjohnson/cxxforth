@@ -270,7 +270,7 @@ using a linked list to navigate through them.  We are going to just use a
 
 One of the members of `Definition` is a C++ `std::string` to hold the name, so
 we won't need to worry about managing the memory for that variable-length
-field.
+field.  The `name` field will be empty for a `:NONAME` definition.
 
 A `Definition` also needs a `code` field that points to the native code
 associated with the word, a `does` field pointing to associated Forth
@@ -318,6 +318,8 @@ struct Definition {
     bool isImmediate() const { return (flags & FlagImmediate) != 0; }
 
     void toggleImmediate()   { flags ^= FlagImmediate; }
+
+    bool isFindable() const  { return !name.empty() && !isHidden(); }
 };
 
 /****
@@ -1461,6 +1463,19 @@ void colon() {
     latest.toggleHidden();
 }
 
+// :NONAME ( C:  -- colon-sys )  ( S:  -- xt )
+void noname() {
+    alignDataPointer();
+
+    Definition defn;
+    defn.code = doColon;
+    defn.parameter = defn.does = AADDR(dataPointer);
+    definitions.emplace_back(std::move(defn));
+
+    isCompiling = true;
+    latest();
+}
+
 void doDoes() {
     doCreate();
     doColon();
@@ -1534,7 +1549,7 @@ Xt findDefinition(CAddr nameToFind, Cell nameLength) {
 
     for (auto i = definitions.rbegin(); i != definitions.rend(); ++i) {
         auto& defn = *i;
-        if (defn.isHidden())
+        if (!defn.isFindable())
             continue;
         auto& name = defn.name;
         if (name.length() == nameLength) {
@@ -1592,7 +1607,7 @@ void xtToName() {
 // WORDS ( -- )
 void words() {
     std::for_each(definitions.rbegin(), definitions.rend(), [](auto& defn) {
-        if (!defn.isHidden()) cout << defn.name << " ";
+        if (defn.isFindable()) cout << defn.name << " ";
     });
 }
 
@@ -1921,6 +1936,7 @@ void definePrimitives() {
         {"/",             slash},
         {"/MOD",          slashMod},
         {":",             colon},
+        {":NONAME",       noname},
         {"<",             lessThan},
         {"=",             equals},
         {">",             greaterThan},
