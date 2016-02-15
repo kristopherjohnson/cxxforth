@@ -889,26 +889,6 @@ void data(Cell x) {
     dataPointer += CellSize;
 }
 
-// , ( x -- )
-void comma() {
-    auto value = *dTop; pop();
-    data(value);
-}
-
-// Store a char to data space.
-void cdata(Cell x) {
-    REQUIRE_VALID_HERE("C,");
-    REQUIRE_DATASPACE_AVAILABLE(1, "C,");
-    *dataPointer = static_cast<Char>(x);
-    dataPointer += 1;
-}
-
-// C, ( char -- )
-void cComma() {
-    auto value = *dTop; pop();
-    cdata(value);
-}
-
 // UNUSED ( -- u )
 void unused() {
     REQUIRE_DSTACK_AVAILABLE(1, "UNUSED");
@@ -1929,7 +1909,6 @@ void definePrimitives() {
         {"(;)",           endOfDefinition},
         {"*",             star},
         {"+",             plus},
-        {",",             comma},
         {"-",             minus},
         {".",             dot},
         {".S",            dotS},
@@ -1957,7 +1936,6 @@ void definePrimitives() {
         {"BL",            bl},
         {"BYE",           bye},
         {"C!",            cstore},
-        {"C,",            cComma},
         {"C@",            cfetch},
         {"CELLS",         cells},
         {"COUNT",         count},
@@ -2043,6 +2021,9 @@ static const char* builtinDefinitions[] = {
     ": CELL+  1 CELLS + ;",
     ": CHAR+  1+ ;",
     ": CHARS  ;",
+
+    ": ,   HERE  1 CELLS ALLOT  ! ;",
+    ": C,  HERE  1 CHARS ALLOT  C! ;",
 
     ": <>   = INVERT ;",
     ": 0<   0 < ;",
