@@ -85,23 +85,24 @@ Building cxxforth
 -----------------
 
 Building the `cxxforth` executable and other targets is easiest if you are on a
-UNIX-ish system that has `make`, `cmake`, and `clang` or `gcc`.  If you have
-those components, you can probably build by just entering these commands:
+UNIX-ish system that has `make`, `cmake`, and Clang or GCC.  If you have those
+components, you can probably build `cxxforth` by just entering these commands:
 
-    cd myfiles/cxxforth
+    cd MyFiles/cxxforth
     make
 
-If successful, the `cxxforth` executable will be built in the `cxxforth/build/`
-subdirectory.
+If successful, the `cxxforth` executable will be built in the
+`MyFiles/cxxforth/build/` subdirectory.
 
 If you don't have one of those components, or if 'make' doesn't work, then it's
 not too hard to build it manually.  You will need to create a file called
 `cxxforthconfig.h`, which can be empty, then you need to invoke your C++
 compiler on the `cxxforth.cpp` source file, enabling whatever options might be
-needed for C++14 compatibility.  For example, on a Linux system with gcc, you
-should be able to build it by entering these commands:
+needed for C++14 compatibility and to link with the necessary C++ and system
+libraries.  For example, on a Linux system with gcc, you should be able to
+build it by entering these commands:
 
-    cd myfiles/cxxforth
+    cd MyFiles/cxxforth
     touch cxxforthconfig.h
     g++ -std=c++14 -o cxxforth cxxforth.cpp
 
@@ -131,15 +132,32 @@ the `cxxforthconfig.h` file produced by the CMake build.
 #include <string>
 #include <thread>
 
+using std::cerr;
+using std::cout;
+using std::endl;
+using std::exception;
+using std::ptrdiff_t;
+using std::runtime_error;
+using std::size_t;
+using std::string;
+
 /****
 
-cxxforht can use the GNU Readline library for user input if it is available.
+GNU Readline Support
+--------------------
 
-The CMake build will detect whether the library is available, and if so define
-`CXXFORTH_USE_READLINE`.  However, you may not want to link your executable
-with GNU Readline due to its licensing terms.  You can pass
+cxxforth can use the [GNU Readline][readline] library for user input if it is
+available.
+
+The CMake build will automatically detect whether the library is available, and
+if so define `CXXFORTH_USE_READLINE`.
+
+However, even if the GNU Readline library is available, you may not want to
+link your executable with it due to its GPL licensing terms.  You can pass
 `-DCXXFORTH_DISABLE_READLINE=ON` to `cmake` to prevent it from searching for
 the library.
+
+[readline]: https://cnswww.cns.cwru.edu/php/chet/readline/rltop.html
 
 ****/
 
@@ -149,6 +167,9 @@ the library.
 #endif
 
 /****
+
+Configuration Constants
+-----------------------
 
 We have a few macros to define the size of the Forth data space, the maximum
 numbers of cells on the data and return stacks, and the maximum number of word
@@ -173,6 +194,9 @@ in case they have not been defined.
 #endif
 
 /****
+
+Data Types
+----------
 
 We'll start by defining some basic types.  A `Cell` is the basic Forth type.
 We define our cell using the C++ `uintptr_t` type to ensure it is large enough
@@ -199,10 +223,10 @@ code with `reinterpret_cast<>()`.
 
 namespace {
 
-using Cell = uintptr_t;
+using Cell  = uintptr_t;
 using SCell = intptr_t;
 
-using Char = unsigned char;
+using Char  = unsigned char;
 using SChar = signed char;
 
 using CAddr = Char*;  // Any address
@@ -212,15 +236,18 @@ using AAddr = Cell*;  // Cell-aligned address
 #define CADDR(x)   reinterpret_cast<Char*>(x)
 #define AADDR(x)   reinterpret_cast<AAddr>(x)
 #define CHARPTR(x) reinterpret_cast<char*>(x)
-#define SIZE_T(x)  static_cast<std::size_t>(x)
+#define SIZE_T(x)  static_cast<size_t>(x)
 
 constexpr auto CellSize = sizeof(Cell);
 
 /****
 
+Boolean Constants
+-----------------
+
 We define constants for Forth true and false boolean flag values.
 
-Note that the Forth standard says that a true flag is a cell with all bits set,
+Note that the Forth convention is that a true flag is a cell with all bits set,
 unlike the C++ convention of using 1 or any other non-zero value to mean true,
 so we need to be sure to use these constants for all Forth words that return a
 boolean flag.
@@ -232,36 +259,43 @@ constexpr Cell True = ~False;
 
 /****
 
+The Definition Struct
+---------------------
+
 Our first big difference from traditional Forth implementations is how
 we'll store the word definitions for our Forth dictionary.  Traditional Forths
 intersperse the word names in the shared data space along with code and data,
-using a linked list to navigate through them.  We are going to just use an
+using a linked list to navigate through them.  We are going to just use a
 `std::list` of `Definition` structs, outside of the data space.
 
-One of the members of `Definition` is a `std::string` to hold the name, so we
-won't need to worry about managing the memory for that variable-length field.
+One of the members of `Definition` is a C++ `std::string` to hold the name, so
+we won't need to worry about managing the memory for that variable-length
+field.
 
 A `Definition` also needs a `code` field that points to the native code
 associated with the word, a `does` field pointing to associated Forth
 instructions, a `parameter` field that points to associated data-space
 elements, and some bit flags to keep track of whether the word is `IMMEDIATE`
 and/or `HIDDEN`.  We will explore the use of these fields later when we talk
-about the interpreters.
+about the inner and outer interpreters.
 
 `Definition` has a static field `executingWord` that contains the address
 of the `Definition` that was most recently executed.  This can be used by
 `Code` functions to refer to their definitions.
+
+Finally, `Definition` has a few member functions for executing the code and for
+accessing the _hidden_ and _immediate_ flags.
 
 ****/
 
 using Code = void(*)();
 
 struct Definition {
-    Code        code      = nullptr;
-    AAddr       does      = nullptr;
-    AAddr       parameter = nullptr;
-    Cell        flags     = 0;
-    std::string name;
+    Code   code      = nullptr;
+    AAddr  does      = nullptr;
+    AAddr  parameter = nullptr;
+    Cell   flags     = 0;
+    string name;
 
     static constexpr Cell FlagHidden    = (1 << 1);
     static constexpr Cell FlagImmediate = (1 << 2);
@@ -290,12 +324,10 @@ struct Definition {
 
 We will use a pointer to a `Definition` as our Forth _execution token_ (xt).
 
-In many traditional Forths, a "code field address" (CFA) is used as the
-execution token.  It so happens that our `Definition` struct has a `code` field
+In many traditional Forths, the execution token for a word is its "code field
+address" (CFA).  It so happens that our `Definition` struct has a `code` field
 as its first member, so the address of a `Definition` is also the address of a
-code field, so in that sense we are following tradition.  But that detail is
-irrelevant: we could move our code field elswehere in the struct and everything
-would still work.
+code field, so in that sense we are following tradition.
 
 ****/
 
@@ -305,8 +337,11 @@ using Xt = Definition*;
 
 /****
 
+Global Variables
+----------------
+
 With our types defined, we can define our global variables.  We start with the
-Forth data space, data and return stacks.
+Forth data space and the data and return stacks.
 
 For each of these arrays, we also define constants that point to the end of the
 array, so we can easily test whether we have filled them and need to report an
@@ -351,8 +386,8 @@ AAddr rTop        = nullptr;
 
 /****
 
-The colon-definition interpreter needs a pointer to the next instruction to be
-executed.
+The inner-definition interpreter needs a pointer to the next instruction to be
+executed.  This will be explained below in the **Inner Interpreter** section.
 
 ****/
 
@@ -369,15 +404,16 @@ const Definition* Definition::executingWord = nullptr;
 
 /****
 
-There are a few special words whose addresses we will use frequently when
-compiling or executing.  Rather than looking them up in the dictionary as
-needed, we'll cache their values.
+There are a few special words whose XTs we will use frequently when compiling
+or executing.  Rather than looking them up in the dictionary as needed, we'll
+cache their values when initializing.
 
 ****/
 
-Xt doLiteralXt = nullptr;
-Xt setDoesXt   = nullptr;
-Xt exitXt      = nullptr;
+Xt doLiteralXt       = nullptr;
+Xt setDoesXt         = nullptr;
+Xt exitXt            = nullptr;
+Xt endOfDefinitionXt = nullptr;
 
 /****
 
@@ -393,9 +429,16 @@ Cell isCompiling = False;
 We provide a variable that controls the numeric base used for conversion
 between numbers and text.  This corresponds to the Forth `BASE` variable.
 
+Whenever using C++ stream output operators, we will need to ensure the stream's
+numeric output base matches `numericBase`.  To make this easy, we'll define a
+macro `SETBASE()` that calls the `std::setbase` I/O manipulator and use it
+whenever we are writing numeric data using the stream operators.
+
 ****/
 
 Cell numericBase = 10;
+
+#define SETBASE() std::setbase(static_cast<int>(numericBase)) 
 
 /****
 
@@ -406,23 +449,23 @@ corresponding to the Forth `>IN` variable.
 
 ****/
 
-std::string inputBuffer;
+string inputBuffer;
 Cell inputOffset = 0;
 
 /****
 
 We need a buffer to store the result of the Forth `WORD` word.  As with the
-input buffer, we use a `std::string` so we don't need to worry about memory
+input buffer, we use a `string` so we don't need to worry about memory
 management.
 
-Note that while we are using a `std:string`, we can't just use it like one.
-The buffer returned by `WORD` has the word length as its first character.
-So if we need to display the contents of this buffer, we will need to
-convert it to a real string.
+Note that while we are using a `std:string`, its format is not like other
+strings.  The buffer returned by `WORD` has the word length as its first
+character.  So whenever we need to display the contents of this buffer, we will
+need to convert it to a real string.
 
 ****/
 
-std::string wordBuffer;
+string wordBuffer;
 
 /****
 
@@ -431,13 +474,13 @@ we won't need to store the count at the beginning of the buffer.
 
 ****/
 
-std::string parseBuffer;
+string parseBuffer;
 
 /****
 
 We store the `argc` and `argv` values passed to `main()`, for use by the Forth
 program.  These are made available by our non-standard `#ARG` and `ARG` Forth
-words.
+words, defined below.
 
 ****/
 
@@ -455,9 +498,19 @@ our code, we'll define a few simple functions to handle those operations.  We
 can expect the compiler to expand calls to these functions inline, so we aren't
 losing any efficiency.
 
-We will use the expressions `*dTop` and `*rTop` when accessing the top-of-stack
-values without pushing/popping.  We will also use expressions like `*(dTop -
-1)` and `*(dTop - 2)` to reference the items beneath the top of stack.
+Above we defined the global variables `dTop` and `rTop` which point to the top
+of the data stack and return stack. We will use the expressions `*dTop` and
+`*rTop` when accessing the top-of-stack values.  We will also use expressions
+like `*(dTop - 1)` and `*(dTop - 2)` to reference the items beneath the top of
+stack.
+
+When we need to both read and remove a top-of-stack value, our convention will
+be to put both operations on the same line, like this:
+
+    Cell x = *dTop; pop();
+
+A more idiomatic C++ way to write this might be `Cell x = *(dTop--);`, but I
+think that's not as clear.
 
 ****/
 
@@ -469,11 +522,11 @@ void resetRStack() {
     rTop = rStack - 1;
 }
 
-std::ptrdiff_t dStackDepth() {
+ptrdiff_t dStackDepth() {
     return dTop - dStack + 1;
 }
 
-std::ptrdiff_t rStackDepth() {
+ptrdiff_t rStackDepth() {
     return rTop - rStack + 1;
 }
 
@@ -508,10 +561,10 @@ using a C++ exception to return control to the top-level interpreter.
 
 ****/
 
-class AbortException: public std::runtime_error {
+class AbortException: public runtime_error {
 public:
-    AbortException(const std::string& msg): std::runtime_error(msg) {}
-    AbortException(const char* msg): std::runtime_error(msg) {}
+    AbortException(const string& msg): runtime_error(msg) {}
+    AbortException(const char* msg): runtime_error(msg) {}
 };
 
 // ABORT ( i*x -- ) ( R: j*x -- )
@@ -525,7 +578,7 @@ void abort() {
 void abortMessage() {
     auto count = SIZE_T(*dTop); pop();
     auto caddr = CHARPTR(*dTop); pop();
-    std::string message(caddr, count);
+    string message(caddr, count);
     throw AbortException(message);
 }
 
@@ -536,10 +589,10 @@ Runtime Safety Checks
 
 Old-school Forths are implemented by super-programmers who never make coding
 mistakes and so don't want the overhead of bounds-checking or other nanny
-hand-holding.  However, we're just dumb C++ programmers here, and we'd like
-some help to catch our mistakes.
+hand-holding.  However, I'm just a dumb C++ programmer, and I'd like some help
+to catch mistakes.
 
-To that end, we have a set of macros and functions that verify that we have the
+To that end, I have a set of macros and functions that verify that we have the
 expected number of arguments available on our stacks, that we aren't going to
 run off the end of an array, that we aren't going to try to divide by zero, and
 so on.
@@ -550,9 +603,9 @@ Forth application we can run it on that optimized executable for improvied
 performance.
 
 When the `CXXFORTH_SKIP_RUNTIME_CHECKS` macro is not defined, these macros
-will check conditions and throw an `AbortException` if the assertions fail.
-We won't go into the details of these macros here.  Later you will see them
-used in the definitions of our primitive Forth words.
+will check conditions and throw an `AbortException` if the assertions fail.  We
+won't go into the details of these macros here.  Later we will see them used in
+the definitions of our primitive Forth words.
 
 ****/
 
@@ -583,47 +636,78 @@ used in the definitions of our primitive Forth words.
 template<typename T>
 void checkAligned(T addr, const char* name) {
     RUNTIME_ERROR_IF((CELL(addr) % CellSize) != 0,
-                     std::string(name) + ": unaligned address");
+                     string(name) + ": unaligned address");
 }
 
-void requireDStackDepth(std::size_t n, const char* name) {
-    RUNTIME_ERROR_IF(dStackDepth() < static_cast<std::ptrdiff_t>(n),
-                     std::string(name) + ": stack underflow");
+void requireDStackDepth(size_t n, const char* name) {
+    RUNTIME_ERROR_IF(dStackDepth() < static_cast<ptrdiff_t>(n),
+                     string(name) + ": stack underflow");
 }
 
-void requireDStackAvailable(std::size_t n, const char* name) {
+void requireDStackAvailable(size_t n, const char* name) {
     RUNTIME_ERROR_IF((dTop + n) >= dStackLimit,
-                     std::string(name) + ": stack overflow");
+                     string(name) + ": stack overflow");
 }
 
-void requireRStackDepth(std::size_t n, const char* name) {
-    RUNTIME_ERROR_IF(rStackDepth() < std::ptrdiff_t(n),
-                     std::string(name) + ": return stack underflow");
+void requireRStackDepth(size_t n, const char* name) {
+    RUNTIME_ERROR_IF(rStackDepth() < ptrdiff_t(n),
+                     string(name) + ": return stack underflow");
 }
 
-void requireRStackAvailable(std::size_t n, const char* name) {
+void requireRStackAvailable(size_t n, const char* name) {
     RUNTIME_ERROR_IF((rTop + n) >= rStackLimit,
-                     std::string(name) + ": return stack overflow");
+                     string(name) + ": return stack overflow");
 }
 
 void checkValidHere(const char* name) {
     RUNTIME_ERROR_IF(dataPointer < dataSpace || dataSpaceLimit <= dataPointer,
-                     std::string(name) + ": HERE outside data space");
+                     string(name) + ": HERE outside data space");
 }
 
-void requireDataSpaceAvailable(std::size_t n, const char* name) {
+void requireDataSpaceAvailable(size_t n, const char* name) {
     RUNTIME_ERROR_IF((dataPointer + n) >= dataSpaceLimit,
-                     std::string(name) + ": data space overflow");
+                     string(name) + ": data space overflow");
 }
 
 #endif // CXXFORTH_SKIP_RUNTIME_CHECKS
 
 /****
 
-Next we'll define the basic Forth stack manipulation words.  When changing the
-stack, we don't change the stack depth any more than necessary.  For example,
-`SWAP` and `DROP` just rearrange elements on the stack, rather than doing any
-popping or pushing.
+Forth Primitives
+----------------
+
+Now we will start defining the primitive operations that are exposed as Forth
+words.  You can think of these as the opcodes of a virtual Forth processor.
+Once we have our primitive operations defined, we can then write definitions in
+Forth that use these primitives to compile more-complex words.
+
+Whenever you see a comment with a Forth word and stack diagram, like this:
+
+    // DEPTH ( -- +n )
+
+that means the C++ function implements a primitive operation that is exposed as
+a Forth word.
+
+Each of these primitives is a function that takes no arguments and returns no
+result, other than its effects on the Forth data stack, return stack, and data
+space.  Such a function can be assigned to the `code` field of a `Definition`.
+
+When changing the stack, our primitives don't change the stack depth any more
+than necessary.  For example, `PICK` just replaces the top-of-stack value with
+a different value, and `ROLL` uses `std::memmove()` to rearrange elements
+rather than individually popping and pushng them.
+
+You can peek ahead at the `definePrimitives()` function to see how these
+primitives are added to the Forth dictionary.
+
+Forth Stack Operations
+----------------------
+
+Let's start with some basic Forth stack manipulation words.  These differ from
+the push/pop/rpush/rpop/etc. primitives above in that they are intended to be
+called from Forth code rather than from the C++ kernel code.  So we include
+runtime checks and use the stacks rather than passing parameters or returning
+values via C++ mechanisms.
 
 Note that for C++ functions that implement primitive Forth words, we will
 include the Forth names and stack effects in comments. You can look up the
@@ -642,28 +726,6 @@ void depth() {
 void drop() {
     REQUIRE_DSTACK_DEPTH(1, "DROP");
     pop();
-}
-
-// DUP ( x -- x x )
-void dup() {
-    REQUIRE_DSTACK_DEPTH(1, "DUP");
-    REQUIRE_DSTACK_AVAILABLE(1, "DUP");
-    push(*dTop);
-}
-
-// OVER ( x1 x2 -- x1 x2 x1 )
-void over() {
-    REQUIRE_DSTACK_DEPTH(2, "OVER");
-    REQUIRE_DSTACK_AVAILABLE(1, "OVER");
-    push(*(dTop - 1));
-}
-
-// SWAP ( x1 x2 -- x2 x1 )
-void swap() {
-    REQUIRE_DSTACK_DEPTH(2, "SWAP");
-    auto temp = *dTop;
-    *dTop = *(dTop - 1);
-    *(dTop - 1) = temp;
 }
 
 // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
@@ -862,7 +924,7 @@ using C++ iostream objects.
 void emit() {
     REQUIRE_DSTACK_DEPTH(1, "EMIT");
     auto cell = *dTop; pop();
-    std::cout.put(static_cast<char>(cell));
+    cout.put(static_cast<char>(cell));
 }
 
 // TYPE ( c-addr u -- )
@@ -870,24 +932,24 @@ void type() {
     REQUIRE_DSTACK_DEPTH(2, "TYPE");
     auto length = static_cast<std::streamsize>(*dTop); pop();
     auto caddr = CHARPTR(*dTop); pop();
-    std::cout.write(caddr, length);
+    cout.write(caddr, length);
 }
 
 // CR ( -- )
 void cr() {
-    std::cout << std::endl;
+    cout << endl;
 }
 
 // . ( n -- )
 void dot() {
     REQUIRE_DSTACK_DEPTH(1, ".");
-    std::cout << std::setbase(static_cast<int>(numericBase)) << static_cast<SCell>(*dTop) << " ";
+    cout << SETBASE() << static_cast<SCell>(*dTop) << " ";
     pop();
 }
 
 void uDot() {
     REQUIRE_DSTACK_DEPTH(1, "U.");
-    std::cout << std::setbase(static_cast<int>(numericBase)) << *dTop << " ";
+    cout << SETBASE() << *dTop << " ";
     pop();
 }
 
@@ -1012,7 +1074,7 @@ void parse() {
     }
 
     if (inputOffset == inputSize)
-        throw AbortException(std::string("PARSE: Did not find expected delimiter \'" + std::string(1, delim) + "\'"));
+        throw AbortException(string("PARSE: Did not find expected delimiter \'" + string(1, delim) + "\'"));
 
     // Skip over the delimiter
     ++inputOffset;
@@ -1234,9 +1296,9 @@ void utcTimeAndDate () {
 // .S ( -- )
 void dotS() {
     auto depth = dStackDepth();
-    std::cout << std::setbase(static_cast<int>(numericBase)) << "<" << depth << "> ";
+    cout << SETBASE() << "<" << depth << "> ";
     for (auto i = depth; i > 0; --i) {
-        std::cout << static_cast<SCell>(*(dTop - i + 1)) << " ";
+        cout << static_cast<SCell>(*(dTop - i + 1)) << " ";
     }
 }
 
@@ -1280,7 +1342,7 @@ void doColon() {
 
 // EXIT ( -- ) ( R: nest-sys -- )
 void exit() {
-    throw std::runtime_error("EXIT should not be executed");
+    throw runtime_error("EXIT should not be executed");
 }
 
 // (literal) ( -- x )
@@ -1307,22 +1369,25 @@ void literal() {
 //
 // Used by branching/looping constructs.  Unconditionally adds an offset to
 // `next`.  The offset is in the cell following the instruction.
+//
+// The offset is in char units, but must be a multiple of the cell size.
 void branch() {
-    auto offset = reinterpret_cast<SCell>(*(next++));
-    next += offset;
+    auto offset = reinterpret_cast<SCell>(*next);
+    next += offset / static_cast<SCell>(CellSize);
 }
 
-// (0branch) ( flag -- )
+// (zbranch) ( flag -- )
 // 
 // Not an ANS Forth word.
 //
 // Used by branching/looping constructinos.  Adds an offset to `next` if
 // top-of-stack value is zero.  The offset is in the cell following the
+// instruction.  If top-of-stack is not zero, then continue to the next
 // instruction.
-void branchIfZero() {
-    REQUIRE_DSTACK_DEPTH(1, "(0branch)");
-    auto condition = *dTop; pop();
-    if (condition)
+void zbranch() {
+    REQUIRE_DSTACK_DEPTH(1, "(zbranch)");
+    auto flag = *dTop; pop();
+    if (flag == False)
         branch();
     else
         ++next;
@@ -1346,6 +1411,15 @@ Compilation
 // Undefined behavior if the definitions list is empty.
 Definition& lastDefinition() {
     return definitions.back();
+}
+
+// LATEST ( -- xt )
+//
+// Not an ANS Forth word.
+//
+// Puts the execution token of the most recently CREATEd word on the stack.
+void latest() {
+    push(CELL(&lastDefinition()));
 }
 
 // STATE ( -- a-addr )
@@ -1373,7 +1447,7 @@ void create() {
     Definition defn;
     defn.code = doCreate;
     defn.parameter = defn.does = AADDR(dataPointer);
-    defn.name = std::string(caddr, length);
+    defn.name = string(caddr, length);
     definitions.emplace_back(std::move(defn));
 }
 
@@ -1404,9 +1478,20 @@ void does() {
     data(CELL(exitXt));
 }
 
+// (;) ( -- )
+//
+// Not an ANS Forth word.
+//
+// This word is compiled by ; after the EXIT.  It is never executed, but serves
+// as a marker for use in debugging.
+void endOfDefinition() {
+    throw AbortException(";: (;) should not be executed");
+}
+
 // ; ( C: colon-sys -- )
 void semicolon() {
     data(CELL(exitXt));
+    data(CELL(endOfDefinitionXt));
     isCompiling = false;
     lastDefinition().toggleHidden();
 }
@@ -1462,7 +1547,7 @@ Xt findDefinition(CAddr nameToFind, Cell nameLength) {
     return nullptr;
 }
 
-Xt findDefinition(const std::string& name) {
+Xt findDefinition(const string& name) {
     return findDefinition(CADDR(const_cast<char*>(name.data())), static_cast<Cell>(name.length()));
 }
 
@@ -1506,9 +1591,59 @@ void xtToName() {
 
 // WORDS ( -- )
 void words() {
-    std::for_each(definitions.rbegin(), definitions.rend(), [](auto& word) {
-        if (!word.isHidden()) std::cout << word.name << " ";
+    std::for_each(definitions.rbegin(), definitions.rend(), [](auto& defn) {
+        if (!defn.isHidden()) cout << defn.name << " ";
     });
+}
+
+// Given a cell that might be an XT, search for it in the definitions list.
+//
+// Returns a pointer to the definition if found, or nullptr if not.
+Xt findXt(Cell x) {
+    for (auto i = definitions.rbegin(); i != definitions.rend(); ++i) {
+        auto& defn = *i;
+        if (&defn == reinterpret_cast<Xt>(x))
+            return &defn;
+    }
+    return nullptr;
+}
+
+/// Display the words that make up a colon or DOES> definition.
+void seeDoes(AAddr does) {
+    while (XT(*does) != endOfDefinitionXt) {
+        auto xt = findXt(*does);
+        if (xt)
+            cout << " " << xt->name;
+        else
+            cout << " " << SETBASE() << static_cast<SCell>(*does);
+        ++does;
+    }
+    cout << " ;";
+}
+
+// SEE ( "<spaces>name" -- )
+void see() {
+    bl(); word(); find();
+
+    auto found = *dTop; pop();
+    if (!found) throw AbortException("SEE: no such word");
+
+    auto defn = XT(*dTop); pop();
+    if (defn->code == doColon) {
+        cout << ": " << defn->name;
+        seeDoes(defn->does);
+    }
+    else if (defn->code == doCreate || defn->code == doDoes) {
+        cout << "CREATE " << defn->name << " ( " << CELL(defn->parameter) << " )";
+        if (defn->code == doDoes) {
+            cout << " DOES>";
+            seeDoes(defn->does);
+        }
+    }
+    else {
+        cout << ": " << defn->name << " <primitive " << SETBASE() << CELL(defn->code) << "> ;";
+    }
+    if (defn->isImmediate()) cout << " IMMEDIATE";
 }
 
 /****
@@ -1555,7 +1690,7 @@ void parseUnsignedNumber() {
     auto caddr = CADDR(*(dTop - 1));
     auto value = *(dTop - 2);
 
-    auto i = std::size_t(0);
+    auto i = size_t(0);
     while (i < length) {
         auto c = caddr[i];
         if (isValidDigit(c)) {
@@ -1643,7 +1778,7 @@ void interpret() {
                     }
                 }
                 else {
-                    throw AbortException(std::string("unrecognized word: ") + std::string(caddr, length));
+                    throw AbortException(string("unrecognized word: ") + string(caddr, length));
                 }
             }
             else {
@@ -1661,7 +1796,7 @@ void interpret() {
 // Displays "ok" prompt if in interpretation mode.
 void prompt() {
     if (!isCompiling) {
-        std::cout << "  ok";
+        cout << "  ok";
         cr();
     }
 }
@@ -1702,9 +1837,9 @@ void quit() {
             interpret();
         }
         catch (const AbortException& abortEx) {
-            std::string msg(abortEx.what());
+            string msg(abortEx.what());
             if (msg.length() > 0) {
-                std::cout << "<<< Error: " << msg << " >>>" << std::endl;
+                cout << "<<< Error: " << msg << " >>>" << endl;
             }
             resetDStack();
             resetRStack();
@@ -1722,13 +1857,13 @@ void quit() {
 void evaluate() {
     REQUIRE_DSTACK_DEPTH(2, "EVALUATE");
 
-    auto length = static_cast<std::size_t>(*dTop); pop();
+    auto length = static_cast<size_t>(*dTop); pop();
     auto caddr = CHARPTR(*dTop); pop();
 
     auto savedInput = std::move(inputBuffer);
     auto savedOffset = inputOffset;
 
-    inputBuffer = std::string(caddr, length);
+    inputBuffer = string(caddr, length);
     inputOffset = 0;
     interpret();
 
@@ -1772,10 +1907,11 @@ void definePrimitives() {
         // ------------------------------
         {"!",             store},
         {"#ARG",          argCount},
-        {"(0branch)",     branchIfZero},
+        {"(zbranch)",     zbranch},
         {"(branch)",      branch},
         {"(does)",        setDoes},
         {"(literal)",     doLiteral},
+        {"(;)",           endOfDefinition},
         {"*",             star},
         {"+",             plus},
         {",",             comma},
@@ -1813,7 +1949,6 @@ void definePrimitives() {
         {"CREATE",        create},
         {"DEPTH",         depth},
         {"DROP",          drop},
-        {"DUP",           dup},
         {"EMIT",          emit},
         {"EVALUATE",      evaluate},
         {"EXECUTE",       execute},
@@ -1824,11 +1959,11 @@ void definePrimitives() {
         {"HIDDEN",        hidden},
         {"INTERPRET",     interpret},
         {"INVERT",        invert},
+        {"LATEST",        latest},
         {"LSHIFT",        lshift},
         {"MS",            ms},
         {"NEGATE",        negate},
         {"OR",            bitwiseOr},
-        {"OVER",          over},
         {"PARSE",         parse},
         {"PICK",          pick},
         {"PROMPT",        prompt},
@@ -1838,9 +1973,9 @@ void definePrimitives() {
         {"REFILL",        refill},
         {"ROLL",          roll},
         {"RSHIFT",        rshift},
+        {"SEE",           see},
         {"SOURCE",        source},
         {"STATE",         state},
-        {"SWAP",          swap},
         {"TIME&DATE",     timeAndDate},
         {"TRUE",          pushTrue},
         {"TYPE",          type},
@@ -1857,19 +1992,23 @@ void definePrimitives() {
     }
 
     doLiteralXt = findDefinition("(literal)");
-    if (doLiteralXt == nullptr) throw std::runtime_error("Can't find (literal) in kernel dictionary");
-    doLiteralXt->toggleHidden();
+    if (doLiteralXt == nullptr) throw runtime_error("Can't find (literal) in kernel dictionary");
 
     setDoesXt = findDefinition("(does)");
-    if (setDoesXt == nullptr) throw std::runtime_error("Can't find (does) in kernel dictionary");
-    setDoesXt->toggleHidden();
+    if (setDoesXt == nullptr) throw runtime_error("Can't find (does) in kernel dictionary");
 
     exitXt = findDefinition("EXIT");
-    if (exitXt == nullptr) throw std::runtime_error("Can't find EXIT in kernel dictionary");
+    if (exitXt == nullptr) throw runtime_error("Can't find EXIT in kernel dictionary");
+
+    endOfDefinitionXt = findDefinition("(;)");
+    if (endOfDefinitionXt == nullptr) throw runtime_error("Can't find (;) in kernel dictionary");
 }
 
 static const char* builtinDefinitions[] = {
 
+    ": DUP    0 PICK ;",
+    ": OVER   1 PICK ;",
+    ": SWAP   1 ROLL ;",
     ": ROT    2 ROLL ;",
     ": NIP    SWAP DROP ;",
     ": TUCK   SWAP OVER ;",
@@ -1912,17 +2051,17 @@ static const char* builtinDefinitions[] = {
     ": [  FALSE STATE ! ; IMMEDIATE",
     ": ]  TRUE STATE ! ;",
 
-    ": '        BL WORD FIND DROP ;",
-    ": POSTPONE ' , ; IMMEDIATE",
-    ": [']      ' POSTPONE LITERAL ; IMMEDIATE",
+    ": '          BL WORD FIND DROP ;",
+    ": POSTPONE   ' , ; IMMEDIATE",
+    ": [']        ' POSTPONE LITERAL ; IMMEDIATE",
+    ": RECURSE    LATEST , ; IMMEDIATE",
 
     ": CHAR    BL WORD CHAR+ C@ ;",
     ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
 
-    ": AHEAD ; IMMEDIATE",
-    ": IF    ; IMMEDIATE",
-    ": ELSE  ; IMMEDIATE",
-    ": THEN  ; IMMEDIATE",
+    ": IF    ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
+    ": THEN  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
+    ": ELSE  ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
 
 /****
 
@@ -1962,11 +2101,11 @@ With the `builtinDefinitions` array filled, all we need to do is call
 ****/
 
 void defineBuiltins() {
-    static std::size_t lineCount = sizeof(builtinDefinitions) / sizeof(builtinDefinitions[0]);
-    for (std::size_t i = 0; i < lineCount; ++i) {
+    static size_t lineCount = sizeof(builtinDefinitions) / sizeof(builtinDefinitions[0]);
+    for (size_t i = 0; i < lineCount; ++i) {
         auto line = builtinDefinitions[i];
         auto length = std::strlen(line);
-        // std::cerr << "Built-in: " << line << std::endl;
+        // cerr << "Built-in: " << line << endl;
         push(CELL(line));
         push(CELL(length));
         evaluate();
@@ -2006,13 +2145,13 @@ extern "C" int cxxforthRun(int argc, const char** argv) {
 
         auto quit = findDefinition("QUIT");
         if (!quit)
-            throw std::runtime_error("QUIT not defined");
+            throw runtime_error("QUIT not defined");
         quit->execute();
 
         return 0;
     }
-    catch (const std::exception& ex) {
-        std::cerr << "cxxforth: " << ex.what() << std::endl;
+    catch (const exception& ex) {
+        cerr << "cxxforth: " << ex.what() << endl;
         return -1;
     }
 }
@@ -2032,10 +2171,10 @@ library.
 
 int main(int argc, const char** argv) {
     if (argc == 1) {
-        std::cout << "cxxforth "
-                  << cxxforthVersion
-                  << " <https://bitbucket.org/KristopherJohnson/cxxforth>\n"
-                  << "Type \"bye\" to exit." << std::endl;
+        cout << "cxxforth "
+             << cxxforthVersion
+             << " <https://bitbucket.org/KristopherJohnson/cxxforth>\n"
+             << "Type \"bye\" to exit." << endl;
     }
 
     return cxxforthRun(argc, argv);

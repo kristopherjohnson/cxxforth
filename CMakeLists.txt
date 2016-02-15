@@ -19,7 +19,7 @@ add_custom_target(cpp2md.cpp.md ALL build/cpp2md cpp2md.cpp cpp2md.cpp.md
 )
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS "-std=c++14 -Weverything -Wno-c++98-compat -Wno-unused-parameter -Wno-global-constructors -Wno-exit-time-destructors -Wno-unused-function -Wno-unused-const-variable -Wno-unused-macros -Wno-unused-member-function -Wno-unused-variable -Wno-padded -Wno-missing-noreturn -Wno-array-bounds-pointer-arithmetic")
+    set(CMAKE_CXX_FLAGS "-std=c++14 -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-unused-parameter -Wno-global-constructors -Wno-exit-time-destructors -Wno-unused-function -Wno-unused-const-variable -Wno-unused-macros -Wno-unused-member-function -Wno-unused-variable -Wno-padded -Wno-missing-noreturn -Wno-array-bounds-pointer-arithmetic")
 else()
     # Settings for gcc
     set(CMAKE_CXX_FLAGS "-std=c++14 -Wall -Wno-unused-variable -Wno-unused-function")
