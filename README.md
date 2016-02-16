@@ -873,7 +873,7 @@ using C++ iostream objects.
     // . ( n -- )
     void dot() {
         REQUIRE_DSTACK_DEPTH(1, ".");
-        cout << SETBASE() << static_cast<SCell>(*dTop) << " ";
+        cout << SETBASE() << static_cast<SCell>(*dTop);
         pop();
     }
     
@@ -1982,9 +1982,22 @@ working system.
         ": CHAR    BL WORD CHAR+ C@ ;",
         ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
     
+
+See the [Control Structures[jonesforthControlStructures] section of
+`jonesforth.f` for an explanation of how these words work.
+
+[jonesforthControlStructures]: http://git.annexia.org/?p=jonesforth.git;a=blob;f=jonesforth.f;h=5c1309574ae1165195a43250c19c822ab8681671;hb=HEAD#l118
+
+    
         ": IF    ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
         ": THEN  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
         ": ELSE  ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
+    
+        ": BEGIN   HERE ; IMMEDIATE",
+        ": AGAIN   ['] (branch) ,  HERE - , ; IMMEDIATE",
+        ": UNTIL   ['] (zbranch) ,  HERE - , ; IMMEDIATE",
+        ": WHILE   ['] (zbranch) ,  HERE 0 , ; IMMEDIATE",
+        ": REPEAT  ['] (branch) ,  SWAP HERE - ,  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
     
 
 Comments
@@ -1999,14 +2012,17 @@ We will support two standard kinds of Forth comments:
 - If `\` (backslash) appears on a line, the rest of the line is ignored.
 - Text between `(` and `)` are ignored.
 
-Also, we will allow `#!` as a synonym for `\`, so that we can start a Forth
-script with something like this at the top of a Unix shell script:
+Also, we will allow `#!` as a synonym for `\`, so that we can start a
+UNIX shell script with something like this:
 
-    #! /usr/local/bin cxxforth
+    #! /usr/local/bin/cxxforth
 
 Note that a space is required after the `\`, `(`, or `#!` that starts a
 comment.  They are blank-delimited words just like every other Forth word.
 
+To-Do: `(` should support comments that span lines.
+
+    
         ": \\  SOURCE NIP >IN ! ; IMMEDIATE",
         ": #!  SOURCE NIP >IN ! ; IMMEDIATE",
         ": (   [CHAR] ) PARSE 2DROP ; IMMEDIATE",
