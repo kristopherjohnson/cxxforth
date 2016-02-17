@@ -181,6 +181,10 @@ in case they have not been defined.
 
 ****/
 
+#ifndef CXXFORTH_VERSION
+#define CXXFORTH_VERSION "1.0.0"
+#endif
+
 #ifndef CXXFORTH_DATASPACE_SIZE
 #define CXXFORTH_DATASPACE_SIZE (16 * 1024 * sizeof(Cell))
 #endif
@@ -2035,12 +2039,31 @@ void definePrimitives() {
     if (endOfDefinitionXt == nullptr) throw runtime_error("Can't find (;) in kernel dictionary");
 }
 
+/****
+
+The Forth Part
+--------------
+
+With our C++ kernel defined, now we can define the remainder of the system
+using Forth.  To do this, we will create an array of Forth text lines to be
+evaluated when cxxforth initializes itself.
+
+In this section, we won't go into the details of every word defined.  In most
+cases, referring to the ANS Forth standard will be enough to understand what
+the word is supposed to do and the definition will be easy to understand.  But
+we will provide commentary for a few complicated definitions.
+
+****/
+
 static const char* builtinDefinitions[] = {
 
 /****
 
 We'll start by defining all the basic stack operations.  `PICK` and `ROLL` are
 the basis for most of them.
+
+Note that while we don't implement any of the Forth double-cell arithmetic
+operations, double-cell stack operations are still very useful.
 
 ****/
 
@@ -2079,8 +2102,23 @@ We have a few words for incrementing/decrementing the top-of-stack value.
 
     ": +!  DUP >R @ + R> ! ;",
 
+/****
+
+`, ( x -- )` places a cell value in dataspace.
+
+`C, ( char -- )` places a character value in dataspace.
+
+****/
+
     ": ,   HERE  1 CELLS ALLOT  ! ;",
     ": C,  HERE  1 CHARS ALLOT  C! ;",
+
+/****
+
+We have a few relational operators based upon the kernel's relational
+operators.
+
+****/
 
     ": <>   = INVERT ;",
     ": 0<   0 < ;",
@@ -2090,14 +2128,42 @@ We have a few words for incrementing/decrementing the top-of-stack value.
 
     ": 2!  SWAP OVER ! CELL+ ! ;",
 
+/****
+
+`2*` and `2/` multiply or divide a value by 2 by just shift the bits left or
+right.
+
+****/
+
     ": 2*  1 LSHIFT ;",
     ": 2/  1 RSHIFT ;",
+
+/****
+
+A Forth variable is just a named location in dataspace.  We'll use `CREATE` and reserve a cell.
+
+****/
 
     ": VARIABLE  CREATE 0 , ;",
     ": ?         @ . ;",
 
+/****
+
+A Forth constant is similar to a variable in that it is a value stored in
+dataspace, but using the name automatically puts the value on the stack.  We
+can implement this using `CREATE...DOES>`.
+
+****/
+
     ": CONSTANT   CREATE ,    DOES>  @ ;",
     ": 2CONSTANT  CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
+
+/****
+
+`/CELL` is not an ANS Forth word, but it is often useful to be able to get the
+size of a cell without using `1 CELLS`.
+
+****/
 
     "1 CELLS  CONSTANT /CELL",
 
@@ -2116,6 +2182,9 @@ We have a few words for incrementing/decrementing the top-of-stack value.
     ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
 
 /****
+
+Control Structures
+------------------
 
 See the [Control Structures[jonesforthControlStructures] section of
 `jonesforth.f` for an explanation of how these words work.
@@ -2148,12 +2217,17 @@ compilation and interpretation mode.
 In interpretation mode, it just returns the address and length of the string in
 the input buffer.
 
-In compilation mode, we have to copy the string somewhere that it can be found
-at execution time.  The way we do this is to compile a forward branch
+In compilation mode, we have to copy the string somewhere where it can be found
+at execution time.  The way we do this is to compile a forward-branch
 instruction, then copy the string's characters into the word definition between
 the branch and its target instruction, then at the branch target location we
 use `LITERAL` to put the address and length of the word in the definition onto
 the stack.
+
+`." ( "ccc<quote> -- )`
+
+This word prints the given string.  We can implement it in terms of `S"` and
+`TYPE`.
 
 ****/
 
@@ -2163,7 +2237,7 @@ the stack.
     "           ['] (branch) , HERE >R 0 ,",  // compile a branch with dummy offset
     "           R> R> 2DUP >R >R",
     "           SWAP CELL+ SWAP",             // copy into the first byte after the offset
-    "           DUP ALLOT  CMOVE ALIGN",      // allocate dataspace and copy string
+    "           DUP ALLOT  CMOVE ALIGN",      // allocate dataspace and copy string into it
     "           R> DUP POSTPONE THEN",        // resolve the branch
     "           CELL+ POSTPONE LITERAL",      // compile literal for address
     "           R> POSTPONE LITERAL",         // compile literal for length
@@ -2200,6 +2274,39 @@ To-Do: `(` should support comments that span lines.
     ": \\  SOURCE NIP >IN ! ; IMMEDIATE",
     ": #!  POSTPONE \\ ; IMMEDIATE",
     ": (   [CHAR] ) PARSE 2DROP ; IMMEDIATE",
+
+/****
+
+`ABOUT` is not an ANS Forth.  It just prints licensing and credit information.
+
+****/
+
+    ": ABOUT",
+    "      CR",
+    "      .\" cxxforth " CXXFORTH_VERSION "\" CR",
+    "      CR",
+    "      .\" This is free and unencumbered software released into the public domain.\" CR",
+    "      CR",  
+    "      .\" Anyone is free to copy, modify, publish, use, compile, sell, or distribute this\" CR",
+    "      .\" software, either in source code form or as a compiled binary, for any purpose,\" CR",
+    "      .\" commercial or non-commercial, and by any means.\" CR",
+    "      CR",
+    "      .\" In jurisdictions that recognize copyright laws, the author or authors of this\" CR",
+    "      .\" software dedicate any and all copyright interest in the software to the public\" CR",
+    "      .\" domain. We make this dedication for the benefit of the public at large and to\" CR",
+    "      .\" the detriment of our heirs and successors. We intend this dedication to be an\" CR",
+    "      .\" overt act of relinquishment in perpetuity of all present and future rights to\" CR",
+    "      .\" this software under copyright law.\" CR",
+    "      CR",
+    "      .\" THE SOFTWARE IS PROVIDED 'AS IS' WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\" CR",
+    "      .\" IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\" CR",
+    "      .\" FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\" CR",
+    "      .\" AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN\" CR",
+    "      .\" ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\" CR",
+    "      .\" WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\" CR",
+    "      CR",
+    "      .\" For more information, visit <https://bitbucket.org/KristopherJohnson/cxxforth>.\" CR",
+    ";",
 };
 
 /****
@@ -2230,8 +2337,6 @@ void initializeDefinitions() {
 }
 
 } // end anonymous namespace
-
-const char* cxxforthVersion = "1.0.0";
 
 extern "C" void cxxforthReset() {
 
@@ -2282,10 +2387,8 @@ library.
 
 int main(int argc, const char** argv) {
     if (argc == 1) {
-        cout << "cxxforth "
-             << cxxforthVersion
-             << " <https://bitbucket.org/KristopherJohnson/cxxforth>\n"
-             << "Type \"bye\" to exit." << endl;
+        cout << "cxxforth " << CXXFORTH_VERSION << endl
+             << "Type \"about\" for more information.  Type \"bye\" to exit." << endl;
     }
 
     return cxxforthRun(argc, argv);
