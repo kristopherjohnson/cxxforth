@@ -34,6 +34,7 @@ option(CXXFORTH_SKIP_RUNTIME_CHECKS "Skip Forth runtime safety checks"          
 option(CXXFORTH_DISABLE_MAIN        "Do not include a main() in cxxforth.cpp"      OFF)
 option(CXXFORTH_32BIT               "Force 32-bit build on 64-bit platform"        OFF)
 option(CXXFORTH_DISABLE_READLINE    "Do not use GNU Readline library if available" OFF)
+option(CXXFORTH_DISABLE_FILE_ACCESS "Disable the File Access words"                OFF)
 
 if (CXXFORTH_OPTIMIZED)
     set(CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS}")

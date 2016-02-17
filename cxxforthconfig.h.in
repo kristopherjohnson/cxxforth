@@ -13,6 +13,7 @@
 #cmakedefine CXXFORTH_USE_READLINE
 #cmakedefine CXXFORTH_SKIP_RUNTIME_CHECKS
 #cmakedefine CXXFORTH_DISABLE_MAIN
+#cmakedefine CXXFORTH_DISABLE_FILE_ACCESS
 
 #endif // cxxforthconfig_h_included
 

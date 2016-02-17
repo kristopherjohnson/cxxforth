@@ -1001,6 +1001,10 @@ obsolescent requirement.
             ++inputOffset;
         }
     
+        if (inputOffset < inputSize) {
+            ++inputOffset;
+        }
+    
         // Update the count at the beginning of the buffer.
         wordBuffer[0] = static_cast<char>(wordBuffer.size() - 1);
     
@@ -2182,6 +2186,7 @@ To-Do: `(` should support comments that span lines.
         ": ABOUT",
         "      CR",
         "      .\" cxxforth " CXXFORTH_VERSION "\" CR",
+        "      .\" by Kristopher Johnson\" CR",
         "      CR",
         "      .\" This is free and unencumbered software released into the public domain.\" CR",
         "      CR",  
@@ -2203,7 +2208,7 @@ To-Do: `(` should support comments that span lines.
         "      .\" ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\" CR",
         "      .\" WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\" CR",
         "      CR",
-        "      .\" For more information, visit <https://bitbucket.org/KristopherJohnson/cxxforth>.\" CR",
+        "      .\" For more, visit <https://bitbucket.org/KristopherJohnson/cxxforth>.\" CR",
         ";",
     };
     
