@@ -895,6 +895,27 @@ void unused() {
     push(static_cast<Cell>(dataSpaceLimit - dataPointer));
 }
 
+// CMOVE ( c-addr1 c-addr2 u -- ) {
+void cMove() {
+    REQUIRE_DSTACK_DEPTH(3, "CMOVE");
+    auto length = SIZE_T(*dTop); pop();
+    auto dest = CHARPTR(*dTop); pop();
+    auto src = CHARPTR(*dTop); pop();
+    std::memcpy(dest, src, length);
+}
+
+// CMOVE> ( c-addr1 c-addr2 u -- )
+void cMoveUp() {
+    REQUIRE_DSTACK_DEPTH(3, "CMOVE");
+    auto length = SIZE_T(*dTop); pop();
+    auto dst = CHARPTR(*dTop); pop();
+    auto src = CHARPTR(*dTop); pop();
+    for (size_t i = 0; i < length; ++i) {
+        auto offset = length - i - 1;
+        *(src + offset) = *(dst + offset);
+    }
+}
+
 /****
 
 Here we will define our I/O primitives.  We keep things easy and portable by
@@ -1281,6 +1302,19 @@ void dotS() {
     cout << SETBASE() << "<" << depth << "> ";
     for (auto i = depth; i > 0; --i) {
         cout << static_cast<SCell>(*(dTop - i + 1)) << " ";
+    }
+}
+
+// .RS ( -- )
+//
+// Not an ANS Forth word.
+//
+// Like .S, but prints the contents of the return stack.
+void dotRS() {
+    auto depth = rStackDepth();
+    cout << SETBASE() << "<<" << depth << ">> ";
+    for (auto i = depth; i > 0; --i) {
+        cout << static_cast<SCell>(*(rTop - i + 1)) << " ";
     }
 }
 
@@ -1911,6 +1945,7 @@ void definePrimitives() {
         {"+",             plus},
         {"-",             minus},
         {".",             dot},
+        {".RS",           dotRS},
         {".S",            dotS},
         {"/",             slash},
         {"/MOD",          slashMod},
@@ -1938,6 +1973,8 @@ void definePrimitives() {
         {"C!",            cstore},
         {"C@",            cfetch},
         {"CELLS",         cells},
+        {"CMOVE",         cMove},
+        {"CMOVE>",        cMoveUp},
         {"COUNT",         count},
         {"CR",            cr},
         {"CREATE",        create},
@@ -2000,6 +2037,13 @@ void definePrimitives() {
 
 static const char* builtinDefinitions[] = {
 
+/****
+
+We'll start by defining all the basic stack operations.  `PICK` and `ROLL` are
+the basis for most of them.
+
+****/
+
     ": DUP    0 PICK ;",
     ": OVER   1 PICK ;",
     ": SWAP   1 ROLL ;",
@@ -2014,13 +2058,26 @@ static const char* builtinDefinitions[] = {
     ": 2R>    R> R> SWAP ;",
     ": 2R@    R> R> 2DUP >R >R SWAP ;",
 
+/****
+
+We have a few words for incrementing/decrementing the top-of-stack value.
+
+****/
+
     ": 1+  1 + ;",
     ": 1-  1 - ;",
-    ": +!  DUP >R @ + R> ! ;",
 
     ": CELL+  1 CELLS + ;",
     ": CHAR+  1+ ;",
     ": CHARS  ;",
+
+/****
+
+`+! ( n|u a-addr -- )` adds a value to a cell in memory.
+
+****/
+
+    ": +!  DUP >R @ + R> ! ;",
 
     ": ,   HERE  1 CELLS ALLOT  ! ;",
     ": C,  HERE  1 CHARS ALLOT  C! ;",
@@ -2041,6 +2098,8 @@ static const char* builtinDefinitions[] = {
 
     ": CONSTANT   CREATE ,    DOES>  @ ;",
     ": 2CONSTANT  CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
+
+    "1 CELLS  CONSTANT /CELL",
 
     ": DECIMAL  10 BASE ! ;",
     ": HEX      16 BASE ! ;",
@@ -2077,6 +2136,43 @@ See the [Control Structures[jonesforthControlStructures] section of
 
 /****
 
+Strings
+-------
+
+`S" ( "ccc<quote>" -- caddr u )`
+
+This word parses input until it finds a `"` (double quote) and then puts the
+resulting string's address and length on the stack.  It works in both
+compilation and interpretation mode.
+
+In interpretation mode, it just returns the address and length of the string in
+the input buffer.
+
+In compilation mode, we have to copy the string somewhere that it can be found
+at execution time.  The way we do this is to compile a forward branch
+instruction, then copy the string's characters into the word definition between
+the branch and its target instruction, then at the branch target location we
+use `LITERAL` to put the address and length of the word in the definition onto
+the stack.
+
+****/
+
+    ": S\"  [CHAR] \" PARSE",
+    "       STATE @ IF",
+    "           >R",
+    "           ['] (branch) , HERE >R 0 ,",  // compile a branch with dummy offset
+    "           R> R> 2DUP >R >R",
+    "           SWAP CELL+ SWAP",             // copy into the first byte after the offset
+    "           DUP ALLOT  CMOVE ALIGN",      // allocate dataspace and copy string
+    "           R> DUP POSTPONE THEN",        // resolve the branch
+    "           CELL+ POSTPONE LITERAL",      // compile literal for address
+    "           R> POSTPONE LITERAL",         // compile literal for length
+    "       THEN ; IMMEDIATE",
+
+    ": .\"  POSTPONE S\" ['] TYPE , ; IMMEDIATE",
+
+/****
+
 Comments
 --------
 
@@ -2087,7 +2183,7 @@ have to define words to implement comments.
 We will support two standard kinds of Forth comments:
 
 - If `\` (backslash) appears on a line, the rest of the line is ignored.
-- Text between `(` and `)` are ignored.
+- Text between `(` and `)` is ignored.
 
 Also, we will allow `#!` as a synonym for `\`, so that we can start a
 UNIX shell script with something like this:
@@ -2102,7 +2198,7 @@ To-Do: `(` should support comments that span lines.
 ****/
 
     ": \\  SOURCE NIP >IN ! ; IMMEDIATE",
-    ": #!  SOURCE NIP >IN ! ; IMMEDIATE",
+    ": #!  POSTPONE \\ ; IMMEDIATE",
     ": (   [CHAR] ) PARSE 2DROP ; IMMEDIATE",
 };
 
@@ -2111,7 +2207,7 @@ To-Do: `(` should support comments that span lines.
 That is the end of our built-in Forth definitions.
 
 With the `builtinDefinitions` array filled, all we need to do is call
-`EVALUATE` on each line.
+`EVALUATE` on each line to load them into the system.
 
 ****/
 
