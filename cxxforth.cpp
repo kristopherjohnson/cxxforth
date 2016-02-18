@@ -2348,16 +2348,18 @@ See the [Control Structures[jonesforthControlStructures] section of
 
 /****
 
-Here are some more simple words we can define now that we have control structures.
+Here are some more words we can define now that we have control structures.
 
 ****/
     
-    ": ?DUP     DUP 0<> IF DUP THEN ;",
+    ": ?DUP       DUP 0<> IF DUP THEN ;",
 
-    ": ABS      DUP 0 < IF NEGATE THEN ;",
+    ": ABS        DUP 0 < IF NEGATE THEN ;",
 
-    ": SPACE    BL EMIT ;",
-    ": SPACES   BEGIN  DUP 0> WHILE  SPACE 1-  REPEAT  DROP ;",
+    ": SPACE      BL EMIT ;",
+    ": SPACES     BEGIN  DUP 0> WHILE  SPACE 1-  REPEAT  DROP ;",
+
+    ": POSTPONE   BL WORD FIND  1 = IF , ELSE '(lit) , , ['] , , THEN ; IMMEDIATE",
 
 /****
 
@@ -2387,8 +2389,6 @@ This word prints the given string.  We can implement it in terms of `S"` and
 
 ****/
 
-    ": POSTPONE    ' , ; IMMEDIATE",  // TODO: Fix this for non-immediate words.
-
     ": S\"   [CHAR] \" PARSE",
     "        STATE @ IF",
     "            >R",
@@ -2401,14 +2401,14 @@ This word prints the given string.  We can implement it in terms of `S"` and
     "            R> POSTPONE LITERAL",         // compile literal for length
     "        THEN ; IMMEDIATE",
 
-    ": .\"   POSTPONE S\" ['] TYPE , ; IMMEDIATE",
+    ": .\"   POSTPONE S\" POSTPONE TYPE ; IMMEDIATE",
 
     ": ABORT\"   POSTPONE S\"",
-    "            ['] ROT ,",
+    "            POSTPONE ROT",
     "            POSTPONE IF",
-    "            ['] ABORT-MESSAGE ,",
+    "            POSTPONE ABORT-MESSAGE",
     "            POSTPONE THEN",
-    "            ['] 2DROP ,",
+    "            POSTPONE 2DROP",
     "; IMMEDIATE",
 
 /****
