@@ -28,47 +28,51 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ----
 
-`cxxforth` is a simple implementation of a [Forth][forth] system in C++.  There
-are many examples of Forth implementations available on the Internet, but most
-of them are written in assembly language or low-level C, with a focus in
+`cxxforth` is a simple implementation of a [Forth][forth] system in C++.
+
+There are many examples of Forth implementations available on the Internet, but
+most of them are written in assembly language or low-level C, with a focus in
 maximizing efficiency and demonstrating traditional Forth implementation
-techniques.  This Forth is different: Our goal is to use modern C++ to create a
+techniques.  This Forth is different: My goal is to use modern C++ to create a
 Forth implementation that is easy to understand, easy to port, and easy to
-extend.  We're not going to talk about register assignments or addressing modes
+extend.  I'm not going to talk about register assignments or addressing modes
 or opcodes or the trade-offs between indirect threaded code, direct threaded
-code, subroutine threaded code, and token threaded code.  We are just going to
+code, subroutine threaded code, and token threaded code.  I'm just going to
 build a working Forth system in a couple thousand lines of code.
 
 An inspiration for this implementation is Richard W.M. Jones's
-[JONESFORTH][jonesforth].  JONESFORTH is a low-level assembly-language Forth
-implementation written as a very readable tutorial, and we are going to copy
-its style for our higher-level implementation.  Our Forth kernel is written as
-C++ file with large comment blocks, and we have a utility, `cpp2md`, that will
-take that C++ file and convert it to a [Markdown][markdown] format document
-named "README.md" with nicely formatted commentary sections between the C++
-code blocks.
+[JONESFORTH][jonesforth].  JONESFORTH is a Forth implementation written as a
+very readable tutorial, and I am adopting its style for our higher-level
+implementation.  This Forth kernel is written as C++ file with large comment
+blocks, and there is a utility, `cpp2md`, that takes that C++ file and converts
+it to a [Markdown][markdown] format document named "README.md" with nicely
+formatted commentary sections between the C++ code blocks.
 
 As in other Forth systems, the basic design of this Forth is to create a small
-kernel in native code (C++, in our case), and then implement the rest of the
+kernel in native code (C++, in this case), and then implement the rest of the
 system with Forth code.  The kernel has to provide the basic primitives needed
 for memory access, arithmetic, logical operations, and operating system access.
-With those primitives, we can then write Forth code to flesh out the system.
+With those primitives, we can then write Forth code to extend the system.
 
-We are writing C++ conforming to the C++14 standard.  If your C++ compiler
-does not support C++14 yet, you may need to make some modifications to the code
-to get it to build.
+I am writing C++ conforming to the C++14 standard.  If your C++ compiler does
+not support C++14 yet, you may need to make some modifications to the code to
+get it to build.
 
 The Forth words provided by cxxforth are based on those in the [ANS Forth draft
-standard][dpans].  We don't claim conformance to the standard, but the reader
-can use the draft standard as a crude form of documentation for the Forth words
-we implement.  cxxforth implements many of the words from the standard's Core
-and Core Extension word sets, and a smattering of words from other standard
-word sets.
+standard][dpans].  I don't claim conformance to the standard, but you can use
+the draft standard as a crude form of documentation for the Forth words that
+are implemented here.  cxxforth implements many of the words from the
+standard's Core and Core Extension word sets, and a smattering of words from
+other standard word sets.
 
-It is assumed that the reader has some familiarity in C++ and Forth.  It is
-recommended that the reader first read the JONESFORTH source or the source of
-some other Forth implementation to get the basic gist of how Forth is usually
-implemented.
+While this Forth can be seen as a toy implementation, I do want it to be usable
+for real-world applications.  Forth was originally designed to be something
+simple you could build yourself and extend and customize as needed to solve
+your problem.  I hope people can use cxxforth like that.
+
+It is assumed that the reader has some familiarity in C++ and Forth.  You may
+want to first read the JONESFORTH source or the source of some other Forth
+implementation to get the basic gist of how Forth is usually implemented.
 
 [forth]: https://en.wikipedia.org/wiki/Forth_(programming_language) "Forth (programming language)"
 
@@ -87,7 +91,7 @@ Building the `cxxforth` executable and other targets is easiest if you are on a
 UNIX-ish system that has `make`, `cmake`, and Clang or GCC.  If you have those
 components, you can probably build `cxxforth` by just entering these commands:
 
-    cd MyFiles/cxxforth
+    cd wherever_your_files_are/cxxforth
     make
 
 If successful, the `cxxforth` executable will be built in the
@@ -101,7 +105,7 @@ needed for C++14 compatibility and to link with the necessary C++ and system
 libraries.  For example, on a Linux system with gcc, you should be able to
 build it by entering these commands:
 
-    cd MyFiles/cxxforth
+    cd wherever_your_files_are/cxxforth
     touch cxxforthconfig.h
     g++ -std=c++14 -o cxxforth cxxforth.cpp
 
@@ -110,9 +114,9 @@ build it by entering these commands:
 The Code
 --------
 
-In `cxxforth.cpp`, we start by including headers from the C++ Standard Library.
-We also include `cxxforth.h`, which declares exported functions and includes
-the `cxxforthconfig.h` file produced by the CMake build.
+We start by including headers from the C++ Standard Library.  We also include
+`cxxforth.h`, which declares exported functions and includes the
+`cxxforthconfig.h` file produced by the CMake build.
 
     
     #include "cxxforth.h"
@@ -195,38 +199,39 @@ in case they have not been defined.
 Data Types
 ----------
 
-We'll start by defining some basic types.  A `Cell` is the basic Forth type.
-We define our cell using the C++ `uintptr_t` type to ensure it is large enough
-to hold an address.  This generally means that it will be a 32-bit value on
-32-bit platforms and a 64-bit value on 64-bit platforms.  (If you want to build
-a 32-bit Forth on a 64-bit platform with clang or gcc, you can pass the `-m32`
-flag to the compiler and linker.)
+I will start by defining some basic types.  A `Cell` is the basic Forth type.
+I define the `Cell` type using the C++ `uintptr_t` type to ensure it is large
+enough to hold an address.  This generally means that it will be a 32-bit value
+on 32-bit platforms and a 64-bit value on 64-bit platforms.  (If you want to
+build a 32-bit Forth on a 64-bit platform with clang or gcc, you can pass the
+`-m32` flag to the compiler and linker.)
 
-We won't be providing any of the double-cell operations that traditional Forths
+I won't be providing any of the double-cell operations that traditional Forths
 provide.  Double-cell operations were important in the days of 8-bit and 16-bit
 Forths, but with cells of 32 bits or more, many applications have no need for
 them.
 
-We also aren't dealing with floating-point values.  Floating-point support
-would be useful, but we're trying to keep this simple.
+I'm also not dealing with floating-point values.  Floating-point support would
+be useful, but I'm trying to keep this simple.
 
 Forth doesn't require type declarations; a cell can be used as an address, an
 unsigned integer, a signed integer, or a variety of other uses.  However, in
 C++ we will have to be explicit about types to perform the operations we want
-to perform.  So, we define a few types, and a few macros to avoid littering our
-code with `reinterpret_cast<>()`.
+to perform.  So, I define a few additional types to represent the ways that a
+`Cell` can be used, and a few macros to avoid littering our code with
+`reinterpret_cast<>()`.
 
     
     namespace {
     
-    using Cell  = uintptr_t;
-    using SCell = intptr_t;
+    using Cell  = uintptr_t;      // unsigned value
+    using SCell = intptr_t;       // signed valude
     
     using Char  = unsigned char;
     using SChar = signed char;
     
-    using CAddr = Char*;  // Any address
-    using AAddr = Cell*;  // Cell-aligned address
+    using CAddr = Char*;          // Any address
+    using AAddr = Cell*;          // Cell-aligned address
     
     #define CELL(x)    reinterpret_cast<Cell>(x)
     #define CADDR(x)   reinterpret_cast<Char*>(x)
@@ -240,7 +245,7 @@ code with `reinterpret_cast<>()`.
 Boolean Constants
 -----------------
 
-We define constants for Forth true and false boolean flag values.
+Here I define constants for Forth true and false boolean flag values.
 
 Note that the Forth convention is that a true flag is a cell with all bits set,
 unlike the C++ convention of using 1 or any other non-zero value to mean true,
@@ -315,12 +320,7 @@ accessing the _hidden_ and _immediate_ flags.
     };
     
 
-We will use a pointer to a `Definition` as our Forth _execution token_ (xt).
-
-In many traditional Forths, the execution token for a word is its "code field
-address" (CFA).  It so happens that our `Definition` struct has a `code` field
-as its first member, so the address of a `Definition` is also the address of a
-code field, so in that sense we are following tradition.
+We will use a pointer to a `Definition` as our Forth _execution token_ (XT).
 
     
     using Xt = Definition*;
@@ -331,10 +331,10 @@ code field, so in that sense we are following tradition.
 Global Variables
 ----------------
 
-With our types defined, we can define our global variables.  We start with the
-Forth data space and the data and return stacks.
+With the types defined, next we define global variables, starting with the Forth
+data space and the data and return stacks.
 
-For each of these arrays, we also define constants that point to the end of the
+For each of these arrays, there are constants that point to the end of the
 array, so we can easily test whether we have filled them and need to report an
 overflow.
 
@@ -423,8 +423,8 @@ that could overflow.  We also have a current offset into this buffer,
 corresponding to the Forth `>IN` variable.
 
     
-    string inputBuffer;
-    Cell inputOffset = 0;
+    string sourceBuffer;
+    Cell sourceOffset = 0;
     
 
 We need a buffer to store the result of the Forth `WORD` word.  As with the
@@ -441,15 +441,15 @@ need to convert it to a real string.
     
 
 We need a buffer to store the result of the Forth `PARSE` word.  Unlike `WORD`,
-we won't need to store the count at the beginning of the buffer.
+we won't need to store the count at the beginning of this buffer.
 
     
     string parseBuffer;
     
 
-We store the `argc` and `argv` values passed to `main()`, for use by the Forth
-program.  These are made available by our non-standard `#ARG` and `ARG` Forth
-words, defined below.
+Thhe `argc` and `argv` values passed to `main()` are made available for use by
+the Forth program by our non-standard `#ARG` and `ARG` Forth words, defined
+later.
 
     
     size_t commandLineArgCount = 0;
@@ -459,19 +459,19 @@ words, defined below.
 Stack Primitives
 ----------------
 
-We will be spending a lot of time pushing and popping values to and from our
-data and return stacks, so in lieu of sprinkling pointer arithmetic all through
-our code, we'll define a few simple functions to handle those operations.  We
-can expect the compiler to expand calls to these functions inline, so we aren't
-losing any efficiency.
+I will be doing a lot of pushing and popping values to and from our data and
+return stacks, so in lieu of sprinkling pointer arithmetic throughout our code,
+I'll define a few simple functions to handle those operations.  We can expect
+the compiler to expand calls to these functions inline, so we aren't losing any
+efficiency.
 
-Above we defined the global variables `dTop` and `rTop` which point to the top
-of the data stack and return stack. We will use the expressions `*dTop` and
-`*rTop` when accessing the top-of-stack values.  We will also use expressions
+Above I defined the global variables `dTop` and `rTop` to point to the top of
+the data stack and return stack.  I will use the expressions `*dTop` and
+`*rTop` when accessing the top-of-stack values.  I will also use expressions
 like `*(dTop - 1)` and `*(dTop - 2)` to reference the items beneath the top of
 stack.
 
-When we need to both read and remove a top-of-stack value, our convention will
+When I need to both read and remove a top-of-stack value, my convention will
 be to put both operations on the same line, like this:
 
     Cell x = *dTop; pop();
@@ -480,18 +480,22 @@ A more idiomatic C++ way to write this might be `Cell x = *(dTop--);`, but I
 think that's not as clear.
 
     
+    // Make the data stack empty.
     void resetDStack() {
         dTop = dStack - 1;
     }
     
+    // Make the return stack empty.
     void resetRStack() {
         rTop = rStack - 1;
     }
     
+    // Return the depth of the data stack.
     ptrdiff_t dStackDepth() {
         return dTop - dStack + 1;
     }
     
+    // Return the depth of the return stack.
     ptrdiff_t rStackDepth() {
         return rTop - rStack + 1;
     }
@@ -521,8 +525,15 @@ Exceptions
 ----------
 
 Forth provides the `ABORT` and `ABORT"` words, which interrupt execution and
-return control to the main `QUIT` loop.  We will implement this functionality
+return control to the main `QUIT` loop.  I will implement this functionality
 using a C++ exception to return control to the top-level interpreter.
+
+The C++ functions `abort()` and `abortMessage()` defined here are the first
+primitive functions that will be exposed as Forth words.  For each such word, I
+will spell out the Forth name of the primitive in all-caps, and provide a Forth
+comment showing the stack effects.  For words described in the ANS Forth draft
+standard, I will generally not provide any more information, but for words that
+are not ANS Forth words, I'll provide a brief description.
 
     
     class AbortException: public runtime_error {
@@ -537,8 +548,11 @@ using a C++ exception to return control to the top-level interpreter.
     }
     
     // ABORT-MESSAGE ( i*x c-addr u -- ) ( R: j*x -- )
-    // Same semantics as ABORT", but takes a string address and length instead
-    // of parsing message.
+    // 
+    // Not an ANS Forth word.
+    //
+    // Same semantics as ANS Forth's ABORT", but takes a string address and length
+    // instead of parsing message.
     void abortMessage() {
         auto count = SIZE_T(*dTop); pop();
         auto caddr = CHARPTR(*dTop); pop();
@@ -560,28 +574,29 @@ expected number of arguments available on our stacks, that we aren't going to
 run off the end of an array, that we aren't going to try to divide by zero, and
 so on.
 
-We can define the macro `CXXFORTH_SKIP_RUNTIME_CHECKS` to generate an
-executable that doesn't include these checks, so when we have a fully debugged
-Forth application we can run it on that optimized executable for improvied
+You can define the macro `CXXFORTH_SKIP_RUNTIME_CHECKS` to generate an
+executable that doesn't include these checks, so when you have a fully debugged
+Forth application you can run it on that optimized executable for improvied
 performance.
 
-When the `CXXFORTH_SKIP_RUNTIME_CHECKS` macro is not defined, these macros
-will check conditions and throw an `AbortException` if the assertions fail.  We
-won't go into the details of these macros here.  Later we will see them used in
-the definitions of our primitive Forth words.
+When the `CXXFORTH_SKIP_RUNTIME_CHECKS` macro is not defined, these macros will
+check conditions and throw an `AbortException` if the assertions fail.  I won't
+go into the details of these macros here.  Later we will see them used in the
+definitions of our primitive Forth words.
 
     
     #ifdef CXXFORTH_SKIP_RUNTIME_CHECKS
     
-    #define RUNTIME_ERROR(msg)                   do { } while (0)
-    #define RUNTIME_ERROR_IF(cond, msg)          do { } while (0)
-    #define REQUIRE_DSTACK_DEPTH(n, name)        do { } while (0)
-    #define REQUIRE_DSTACK_AVAILABLE(n, name)    do { } while (0)
-    #define REQUIRE_RSTACK_DEPTH(n, name)        do { } while (0)
-    #define REQUIRE_RSTACK_AVAILABLE(n, name)    do { } while (0)
-    #define REQUIRE_ALIGNED(addr, name)          do { } while (0)
-    #define REQUIRE_VALID_HERE(name)             do { } while (0)
-    #define REQUIRE_DATASPACE_AVAILABLE(n, name) do { } while (0)
+    #define RUNTIME_NO_OP()                      do { } while (0)
+    #define RUNTIME_ERROR(msg)                   RUNTIME_NO_OP()
+    #define RUNTIME_ERROR_IF(cond, msg)          RUNTIME_NO_OP()
+    #define REQUIRE_DSTACK_DEPTH(n, name)        RUNTIME_NO_OP()
+    #define REQUIRE_DSTACK_AVAILABLE(n, name)    RUNTIME_NO_OP()
+    #define REQUIRE_RSTACK_DEPTH(n, name)        RUNTIME_NO_OP()
+    #define REQUIRE_RSTACK_AVAILABLE(n, name)    RUNTIME_NO_OP()
+    #define REQUIRE_ALIGNED(addr, name)          RUNTIME_NO_OP()
+    #define REQUIRE_VALID_HERE(name)             RUNTIME_NO_OP()
+    #define REQUIRE_DATASPACE_AVAILABLE(n, name) RUNTIME_NO_OP()
     
     #else
     
@@ -637,28 +652,21 @@ the definitions of our primitive Forth words.
 Forth Primitives
 ----------------
 
-Now we will start defining the primitive operations that are exposed as Forth
+Now I will start defining the primitive operations that are exposed as Forth
 words.  You can think of these as the opcodes of a virtual Forth processor.
 Once we have our primitive operations defined, we can then write definitions in
 Forth that use these primitives to compile more-complex words.
-
-Whenever you see a comment with a Forth word and stack diagram, like this:
-
-    // DEPTH ( -- +n )
-
-that means the C++ function implements a primitive operation that is exposed as
-a Forth word.
 
 Each of these primitives is a function that takes no arguments and returns no
 result, other than its effects on the Forth data stack, return stack, and data
 space.  Such a function can be assigned to the `code` field of a `Definition`.
 
-When changing the stack, our primitives don't change the stack depth any more
+When changing the stack, the primitives don't change the stack depth any more
 than necessary.  For example, `PICK` just replaces the top-of-stack value with
 a different value, and `ROLL` uses `std::memmove()` to rearrange elements
 rather than individually popping and pushng them.
 
-You can peek ahead at the `definePrimitives()` function to see how these
+You can peek ahead to the `definePrimitives()` function to see how these
 primitives are added to the Forth dictionary.
 
 Forth Stack Operations
@@ -667,8 +675,8 @@ Forth Stack Operations
 Let's start with some basic Forth stack manipulation words.  These differ from
 the push/pop/rpush/rpop/etc. primitives above in that they are intended to be
 called from Forth code rather than from the C++ kernel code.  So we include
-runtime checks and use the stacks rather than passing parameters or returning
-values via C++ mechanisms.
+runtime checks and use the stacks rather than passing arguments or returning
+values via C++ call/return mechanisms.
 
 Note that for C++ functions that implement primitive Forth words, we will
 include the Forth names and stack effects in comments. You can look up the
@@ -789,8 +797,8 @@ values in data space.
     }
     
 
-Now we will define the Forth words for accessing and manipulating the data
-space pointer.
+Next, some primitives for accessing and manipulating the data-space pointer,
+`HERE`.
 
     
     template<typename T>
@@ -806,6 +814,7 @@ space pointer.
     // ALIGN ( -- )
     void align() {
         alignDataPointer();
+        REQUIRE_VALID_HERE("ALIGN");
     }
     
     // ALIGNED ( addr -- a-addr )
@@ -849,7 +858,7 @@ space pointer.
         push(static_cast<Cell>(dataSpaceLimit - dataPointer));
     }
     
-    // CMOVE ( c-addr1 c-addr2 u -- ) {
+    // CMOVE ( c-addr1 c-addr2 u -- )
     void cMove() {
         REQUIRE_DSTACK_DEPTH(3, "CMOVE");
         auto length = SIZE_T(*dTop); pop();
@@ -871,8 +880,9 @@ space pointer.
     }
     
 
-Here we will define our I/O primitives.  We keep things easy and portable by
-using C++ iostream objects.
+Here I will define some I/O primitives.
+
+We keep things simple and portable by using C++ iostream objects.
 
     
     // EMIT ( x -- )
@@ -902,6 +912,7 @@ using C++ iostream objects.
         pop();
     }
     
+    // U. ( x -- )
     void uDot() {
         REQUIRE_DSTACK_DEPTH(1, "U.");
         cout << SETBASE() << *dTop << " ";
@@ -917,19 +928,19 @@ using C++ iostream objects.
     // SOURCE ( -- c-addr u )
     void source() {
         REQUIRE_DSTACK_AVAILABLE(2, "SOURCE");
-        push(CELL(inputBuffer.data()));
-        push(inputBuffer.length());
+        push(CELL(sourceBuffer.data()));
+        push(sourceBuffer.length());
     }
     
     // >IN ( -- a-addr )
-    void in() {
+    void toIn() {
         REQUIRE_DSTACK_AVAILABLE(1, ">IN");
-        push(CELL(&inputOffset));
+        push(CELL(&sourceOffset));
     }
     
 
 `REFILL` reads a line from the user input device.  If successful, it puts the
-result into `inputBuffer`, sets `inputOffset` to 0, and pushes a `TRUE` flag
+result into `sourceBuffer`, sets `sourceOffset` to 0, and pushes a `TRUE` flag
 onto the stack.  If not successful, it pushes a `FALSE` flag.
 
 We use GNU Readline if configured to do so.  Otherwise we use the C++
@@ -943,8 +954,8 @@ We use GNU Readline if configured to do so.  Otherwise we use the C++
     #ifdef CXXFORTH_USE_READLINE
         char* line = readline("");
         if (line) {
-            inputBuffer = line;
-            inputOffset = 0;
+            sourceBuffer = line;
+            sourceOffset = 0;
             if (*line)
                 add_history(line);
             std::free(line);
@@ -954,8 +965,8 @@ We use GNU Readline if configured to do so.  Otherwise we use the C++
             pushFalse();
         }
     #else
-        if (std::getline(std::cin, inputBuffer)) {
-            inputOffset = 0;
+        if (std::getline(std::cin, sourceBuffer)) {
+            sourceOffset = 0;
             pushTrue();
         }
         else {
@@ -965,20 +976,20 @@ We use GNU Readline if configured to do so.  Otherwise we use the C++
     }
     
 
-The text interpreter and many Forth words use `WORD` to parse a set of
-characters from the input.  `WORD` skips any delimiters at the current input
-position, then reads characters until it finds the delimiter again.  It returns
-the address of a buffer with the length in the first byte, followed by the
-characters that made up the word.
+The text interpreter and many Forth words use `WORD` to parse a blank-delimited
+sequence of characters from the input.  `WORD` skips any delimiters at the
+current input position, then reads characters until it finds the delimiter
+again.  It returns the address of a buffer with the length in the first byte,
+followed by the characters that made up the word.
 
-In a few places below, you will see the call sequence `bl(); word(); count();`
-This corresponds to the Forth phrase `BL WORD COUNT`, which is how many Forth
-definitions read a space-delimited word from the input and get its address and
-length.
+In a few places later in the C++ code, you will see the call sequence `bl();
+word(); count();` This corresponds to the Forth phrase `BL WORD COUNT`, which
+is how many Forth definitions read a space-delimited word from the input and
+get its address and length.
 
-The ANS Forth draft standard specifies that the buffer must contain a space
-character after the character data, but we aren't going to worry about this
-obsolescent requirement.
+The ANS Forth draft standard specifies that the `WORD` buffer must contain a
+space character after the character data, but we aren't going to worry about
+this obsolescent requirement.
 
     
     // WORD ( char "<chars>ccc<char>" -- c-addr )
@@ -989,20 +1000,20 @@ obsolescent requirement.
         wordBuffer.clear();
         wordBuffer.push_back(0);  // First char of buffer is length.
     
-        auto inputSize = inputBuffer.size();
+        auto inputSize = sourceBuffer.size();
     
         // Skip leading delimiters
-        while (inputOffset < inputSize && inputBuffer[inputOffset] == delim)
-            ++inputOffset;
+        while (sourceOffset < inputSize && sourceBuffer[sourceOffset] == delim)
+            ++sourceOffset;
     
         // Copy characters until we see the delimiter again.
-        while (inputOffset < inputSize && inputBuffer[inputOffset] != delim) {
-            wordBuffer.push_back(inputBuffer[inputOffset]);
-            ++inputOffset;
+        while (sourceOffset < inputSize && sourceBuffer[sourceOffset] != delim) {
+            wordBuffer.push_back(sourceBuffer[sourceOffset]);
+            ++sourceOffset;
         }
     
-        if (inputOffset < inputSize) {
-            ++inputOffset;
+        if (sourceOffset < inputSize) {
+            ++sourceOffset;
         }
     
         // Update the count at the beginning of the buffer.
@@ -1010,6 +1021,11 @@ obsolescent requirement.
     
         *dTop = CELL(wordBuffer.data());
     }
+    
+
+`PARSE` is similar to `WORD`, but does not skip leading delimiters and provides
+an address-length result.
+
     
     // PARSE ( char "ccc<char>" -- c-addr u )
     void parse() {
@@ -1020,27 +1036,28 @@ obsolescent requirement.
     
         parseBuffer.clear();
     
-        auto inputSize = inputBuffer.size();
+        auto inputSize = sourceBuffer.size();
     
         // Copy characters until we see the delimiter.
-        while (inputOffset < inputSize && inputBuffer[inputOffset] != delim) {
-            parseBuffer.push_back(inputBuffer[inputOffset]);
-            ++inputOffset;
+        while (sourceOffset < inputSize && sourceBuffer[sourceOffset] != delim) {
+            parseBuffer.push_back(sourceBuffer[sourceOffset]);
+            ++sourceOffset;
         }
     
-        if (inputOffset == inputSize)
+        if (sourceOffset == inputSize)
             throw AbortException(string("PARSE: Did not find expected delimiter \'" + string(1, delim) + "\'"));
     
         // Skip over the delimiter
-        ++inputOffset;
+        ++sourceOffset;
     
         *dTop = CELL(parseBuffer.data());
         push(static_cast<Cell>(parseBuffer.size()));
     }
     
 
-`BL` puts a space character on the stack.  It is often used as `BL WORD` to
-parse a space-delimited word.
+`BL` puts a space character on the stack.  It is often seen in the phrase `BL
+WORD` to parse a space-delimited word, and will be seen later in the Forth
+definition of `SPACE`.
 
     
     // BL ( -- char )
@@ -1185,7 +1202,7 @@ Define system and environmental primitives
     
     // ARG ( n -- c-addr u )
     //
-    // Not an ANS Forth word.`
+    // Not an ANS Forth word.
     //
     // Provide the Nth command-line argument.
     void argAtIndex() {
@@ -1253,7 +1270,8 @@ Define system and environmental primitives
     //
     // Not an ANS Forth word.
     //
-    // Like .S, but prints the contents of the return stack.
+    // Like .S, but prints the contents of the return stack instead of the data
+    // stack.
     void dotRS() {
         auto depth = rStackDepth();
         cout << SETBASE() << "<<" << depth << ">> ";
@@ -1268,7 +1286,7 @@ Inner Interpreter
 
 A Forth system is said to have two interpreters: an "outer interpreter" which
 reads input and interprets it, and an "inner interpreter" which executes
-compiled Forth definitions.  We'll start with the inner interpreter.
+compiled Forth definitions.  I will start with the inner interpreter.
 
 There are basically two kinds of words in a Forth system:
 
@@ -1276,13 +1294,17 @@ There are basically two kinds of words in a Forth system:
 - colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
 
 Every defined word has a `code` field that points to native code.  In the case
-of "code" words, the `code` field points to a routine that performs the
+of primitive words, the `code` field points to a routine that performs the
 operation.  In the case of a colon definition, the `code` field points to the
 `doColon()` function, which saves the current program state and then starts
 executing the words that make up the colon definition.
 
 Each colon definition ends with a call to `EXIT`, which sets up a return to the
-colon definition that called the current word.
+colon definition that called the current word.  In many traditional Forths, the
+`EXIT` instruction is implemented as a jump/branch to the next machine-code
+instruction to be executed.  But that's not easy to do in a portable way in
+C++, so my `doColon()` just keeps going until it sees an `EXIT` instruction,
+then returns to the caller without actually executing it.
 
     
     void doColon() {
@@ -1301,54 +1323,6 @@ colon definition that called the current word.
     // EXIT ( -- ) ( R: nest-sys -- )
     void exit() {
         throw runtime_error("EXIT should not be executed");
-    }
-    
-    // (lit) ( -- x )
-    //
-    // Not an ANS Forth word.
-    //
-    // Compiled by LITERAL.
-    void doLiteral() {
-        REQUIRE_DSTACK_AVAILABLE(1, "(lit)");
-        push(CELL(*next));
-        ++next;
-    }
-    
-    // (branch) ( -- )
-    // 
-    // Not an ANS Forth word.
-    //
-    // Used by branching/looping constructs.  Unconditionally adds an offset to
-    // `next`.  The offset is in the cell following the instruction.
-    //
-    // The offset is in char units, but must be a multiple of the cell size.
-    void branch() {
-        auto offset = reinterpret_cast<SCell>(*next);
-        next += offset / static_cast<SCell>(CellSize);
-    }
-    
-    // (zbranch) ( flag -- )
-    // 
-    // Not an ANS Forth word.
-    //
-    // Used by branching/looping constructinos.  Adds an offset to `next` if
-    // top-of-stack value is zero.  The offset is in the cell following the
-    // instruction.  If top-of-stack is not zero, then continue to the next
-    // instruction.
-    void zbranch() {
-        REQUIRE_DSTACK_DEPTH(1, "(zbranch)");
-        auto flag = *dTop; pop();
-        if (flag == False)
-            branch();
-        else
-            ++next;
-    }
-    
-    // EXECUTE ( i*x xt -- j*x )
-    void execute() {
-        REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
-        auto defn = XT(*dTop); pop();
-        defn->execute();
     }
     
 
@@ -1471,6 +1445,66 @@ Compilation
     // Toggles the hidden bit of the ost recent definition.
     void hidden() { lastDefinition().toggleHidden(); }
     
+
+Next I'll define a few "special words".  They are special in that they are used
+to implement features of the inner interpreter, and are not generally used by
+Forth application code.  As a signifier of their special nature, the words'
+names start and end with with parentheses.
+
+    
+    // (lit) ( -- x )
+    //
+    // Not an ANS Forth word.
+    //
+    // This instruction gets the value of the next cell, puts that on the data
+    // stack, and then moves the instruction pointer to the next instruction.  It
+    // is used by `LITERAL` and other Forth words that need to specify a cell value
+    // to put on the stack during execution.
+    void doLiteral() {
+        REQUIRE_DSTACK_AVAILABLE(1, "(lit)");
+        push(CELL(*next));
+        ++next;
+    }
+    
+    // (branch) ( -- )
+    // 
+    // Not an ANS Forth word.
+    //
+    // Used by branching/looping constructs.  Unconditionally adds an offset to
+    // `next`.  The offset is in the cell following the instruction.
+    //
+    // The offset is in character units, but must be a multiple of the cell size.
+    void branch() {
+        auto offset = reinterpret_cast<SCell>(*next);
+        next += offset / static_cast<SCell>(CellSize);
+    }
+    
+    // (zbranch) ( flag -- )
+    // 
+    // Not an ANS Forth word.
+    //
+    // Used by branching/looping constructinos.  Adds an offset to `next` if the
+    // top-of-stack value is zero.  The offset is in the cell following the
+    // instruction.  If top-of-stack is not zero, then continue to the next
+    // instruction.
+    void zbranch() {
+        REQUIRE_DSTACK_DEPTH(1, "(zbranch)");
+        auto flag = *dTop; pop();
+        if (flag == False)
+            branch();
+        else
+            ++next;
+    }
+    
+
+Dictionary
+----------
+
+The next section contains words that create elements in the `definitions` list,
+look up elements by name, or traverse the list to perform some operation.
+
+    
+    // Create a new definition with specified name and code.
     void defineCodeWord(const char* name, Code code) {
         alignDataPointer();
     
@@ -1481,6 +1515,7 @@ Compilation
         definitions.emplace_back(std::move(defn));
     }
     
+    // Determine whether two names are equivalent, using case-insensitive matching.
     bool doNamesMatch(CAddr name1, CAddr name2, Cell nameLength) {
         for (size_t i = 0; i < nameLength; ++i) {
             if (std::toupper(name1[i]) != std::toupper(name2[i])) {
@@ -1490,6 +1525,7 @@ Compilation
         return true;
     }
     
+    // Find a definition by name.
     Xt findDefinition(CAddr nameToFind, Cell nameLength) {
         if (nameLength == 0)
             return nullptr;
@@ -1509,6 +1545,7 @@ Compilation
         return nullptr;
     }
     
+    // Find a definition by name.
     Xt findDefinition(const string& name) {
         return findDefinition(CADDR(const_cast<char*>(name.data())), static_cast<Cell>(name.length()));
     }
@@ -1528,6 +1565,13 @@ Compilation
             *dTop = CELL(word);
             push(word->isImmediate() ? 1 : Cell(-1));
         }
+    }
+    
+    // EXECUTE ( i*x xt -- j*x )
+    void execute() {
+        REQUIRE_DSTACK_DEPTH(1, "EXECUTE");
+        auto defn = XT(*dTop); pop();
+        defn->execute();
     }
     
     // >BODY ( xt -- a-addr )
@@ -1557,6 +1601,30 @@ Compilation
             if (defn.isFindable()) cout << defn.name << " ";
         });
     }
+    
+
+SEE
+---
+
+Most Forth systems provide a word `SEE` that will print out the definition of a word.
+
+My implementation of this word just walks through the contents of a definition
+and tries to "decompile" each cell.  If the cell contains the XT of a defined
+word, then print that word's name.  Otherwise, it just prints the cell value.
+
+This generally gives a readable view of the word's definition, but it is not
+exactly equal to the original source text.  For example, for this definition:
+
+    : add-1-and-2 ( -- )   1 2 + . ;
+
+`SEE add-1-and-2` gives this output:
+
+    : add-1-and-2 (lit) 1 (lit) 2 + . EXIT ;
+
+It gets even messier when decompiling words that contain branches and string
+literals, but it works well as a debugging tool when trying to determine why a
+word is not compiling as expected.
+
     
     // Given a cell that might be an XT, search for it in the definitions list.
     //
@@ -1612,7 +1680,23 @@ Compilation
 Outer Interpreter
 -----------------
 
-See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a description
+The word `INTERPRET` below implements the outer interpreter.  It looks at the
+`sourceBuffer`, and repeats the following until it has processed all the
+characters in the buffer:
+
+- Parse a space-delimited word.
+- Look up that word in the dictionary.
+- If the word is found:
+   - If we are not in compilation mode, or if the word is an immediate word, then execute it.
+   - Otherwise (in compilation mode), compile a call to the word.
+- If the word is not found:
+   - Try to parse it as a number.
+   - If it is a number:
+      - If in compilation mode, then compile it as a literal.
+      - Otherwise, put the value on the stack.
+   - If it is not a number, then signal an error.
+
+See [section 3.4 of the ANS Forth draft standard][dpans_3_4] for a more complete description
 of the Forth text interpreter.
 
 [dpans_3_4]: http://forth.sourceforge.net/std/dpans/dpans3.htm#3.4 "3.4 The Forth text interpreter"
@@ -1629,6 +1713,7 @@ of the Forth text interpreter.
         return ('0' <= c) && (c < ('0' + numericBase));
     }
     
+    // Return numeric value associated with a character.
     Cell digitValue(Char c) {
         if (c >= 'a')
             return c - 'a' + 10;
@@ -1697,8 +1782,8 @@ of the Forth text interpreter.
     //
     // Reads words from the input buffer and executes/compiles them.
     void interpret() {
-        auto inputSize = inputBuffer.size();
-        while (inputOffset < inputSize) {
+        auto inputSize = sourceBuffer.size();
+        while (sourceOffset < inputSize) {
             bl(); word(); find();
     
             auto found = static_cast<int>(*dTop); pop();
@@ -1749,16 +1834,27 @@ of the Forth text interpreter.
         }
     }
     
-    // PROMPT ( -- )
-    //
-    // Not an ANS Forth word.
-    //
-    // Displays "ok" prompt if in interpretation mode.
-    void prompt() {
-        if (!isCompiling) {
-            cout << "  ok";
-            cr();
-        }
+
+`EVALUATE` can be used to invoke `INTERPRET` with a string as the source
+buffer.
+
+    
+    // EVALUATE ( i*x c-addr u -- j*x )
+    void evaluate() {
+        REQUIRE_DSTACK_DEPTH(2, "EVALUATE");
+    
+        auto length = static_cast<size_t>(*dTop); pop();
+        auto caddr = CHARPTR(*dTop); pop();
+    
+        auto savedInput = std::move(sourceBuffer);
+        auto savedOffset = sourceOffset;
+    
+        sourceBuffer = string(caddr, length);
+        sourceOffset = 0;
+        interpret();
+    
+        sourceBuffer = std::move(savedInput);
+        sourceOffset = savedOffset;
     }
     
 
@@ -1774,6 +1870,18 @@ If end-of-input occurs, then it exits the loop and calls `CR` and `BYE`.
 If `QUIT` is called from a word called by `QUIT`, control returns to the
 top-level loop.
 
+    
+    // PROMPT ( -- )
+    //
+    // Not an ANS Forth word.
+    //
+    // Displays "ok" prompt if in interpretation mode.
+    void prompt() {
+        if (!isCompiling) {
+            cout << "  ok";
+            cr();
+        }
+    }
     
     // QUIT ( -- )
     void quit() {
@@ -1809,24 +1917,6 @@ top-level loop.
     
         cr();
         bye();
-    }
-    
-    // EVALUATE ( i*x c-addr u -- j*x )
-    void evaluate() {
-        REQUIRE_DSTACK_DEPTH(2, "EVALUATE");
-    
-        auto length = static_cast<size_t>(*dTop); pop();
-        auto caddr = CHARPTR(*dTop); pop();
-    
-        auto savedInput = std::move(inputBuffer);
-        auto savedOffset = inputOffset;
-    
-        inputBuffer = string(caddr, length);
-        inputOffset = 0;
-        interpret();
-    
-        inputBuffer = std::move(savedInput);
-        inputOffset = savedOffset;
     }
     
 
@@ -1881,7 +1971,7 @@ working system.
             {"=",             equals},
             {">",             greaterThan},
             {">BODY",         toBody},
-            {">IN",           in},
+            {">IN",           toIn},
             {">NUM",          parseSignedNumber},
             {">R",            toR},
             {">UNUM",         parseUnsignedNumber},
@@ -1970,19 +2060,22 @@ using Forth.  To do this, we will create an array of Forth text lines to be
 evaluated when cxxforth initializes itself.
 
 In this section, we won't go into the details of every word defined.  In most
-cases, referring to the ANS Forth standard will be enough to understand what
-the word is supposed to do and the definition will be easy to understand.  But
-we will provide commentary for a few complicated definitions.
+cases, referring to the ANS Forth draft standard will be enough to understand
+what the word is supposed to do and the definition will be easy to understand.
+But we will provide commentary for a few complicated definitions.
+
+Writing Forth definitions as C++ strings is a little awkward in that we have to
+escape every `"` and backslash with a backslash.
 
     
-    static const char* builtinDefinitions[] = {
+    static const char* forthDefinitions[] = {
     
 
-We'll start by defining all the basic stack operations.  `PICK` and `ROLL` are
-the basis for most of them.
+I'll start by defining the remaining basic stack operations.  `PICK` and
+`ROLL` are the basis for most of them.
 
-Note that while we don't implement any of the Forth double-cell arithmetic
-operations, double-cell stack operations are still very useful.
+Note that while I'm not implementing any of the Forth double-cell arithmetic
+operations, double-cell stack operations are still useful.
 
     
         ": DUP     0 PICK ;",
@@ -2000,7 +2093,7 @@ operations, double-cell stack operations are still very useful.
         ": 2R@     R> R> 2DUP >R >R SWAP ;",
     
 
-We have a few words for incrementing/decrementing the top-of-stack value.
+Forth has a few words for incrementing/decrementing the top-of-stack value.
 
     
         ": 1+   1 + ;",
@@ -2026,8 +2119,9 @@ We have a few words for incrementing/decrementing the top-of-stack value.
         ": C,   HERE  1 CHARS ALLOT  C! ;",
     
 
-We have a few relational operators based upon the kernel's relational
-operators.
+We have a few extended relational operators based upon the kernel's relational
+operators.  In a lower-level Forth system, these might have a one-to-one
+mapping to CPU opcodes, but in this system, they are just abbreviations.
 
     
         ": <>    = INVERT ;",
@@ -2035,8 +2129,6 @@ operators.
         ": 0>    0 > ;",
         ": 0=    0 = ;",
         ": 0<>   0= INVERT ;",
-    
-        ": 2!   SWAP OVER ! CELL+ ! ;",
     
 
 `2*` and `2/` multiply or divide a value by 2 by just shift the bits left or
@@ -2063,8 +2155,8 @@ can implement this using `CREATE...DOES>`.
         ": 2CONSTANT   CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
     
 
-`/CELL` is not an ANS Forth word, but it is often useful to be able to get the
-size of a cell without using `1 CELLS`.
+`/CELL` is not an ANS Forth word, but it is useful to be able to get the size
+of a cell without using `1 CELLS`.
 
     
         "1 CELLS   CONSTANT /CELL",
@@ -2126,9 +2218,9 @@ See the [Control Structures[jonesforthControlStructures] section of
 [jonesforthControlStructures]: http://git.annexia.org/?p=jonesforth.git;a=blob;f=jonesforth.f;h=5c1309574ae1165195a43250c19c822ab8681671;hb=HEAD#l118
 
     
-        ": IF     ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
-        ": THEN   DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
-        ": ELSE   ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
+        ": IF       ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
+        ": THEN     DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
+        ": ELSE     ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
     
         ": BEGIN    HERE ; IMMEDIATE",
         ": AGAIN    ['] (branch) ,  HERE - , ; IMMEDIATE",
@@ -2261,14 +2353,14 @@ To-Do: `(` should support comments that span lines.
 
 That is the end of our built-in Forth definitions.
 
-With the `builtinDefinitions` array filled, all we need to do is call
+With the `forthDefinitions` array filled, all we need to do is call
 `EVALUATE` on each line to load them into the system.
 
     
-    void defineBuiltins() {
-        static size_t lineCount = sizeof(builtinDefinitions) / sizeof(builtinDefinitions[0]);
+    void defineForthWords() {
+        static size_t lineCount = sizeof(forthDefinitions) / sizeof(forthDefinitions[0]);
         for (size_t i = 0; i < lineCount; ++i) {
-            auto line = builtinDefinitions[i];
+            auto line = forthDefinitions[i];
             auto length = std::strlen(line);
             // cerr << "Built-in: " << line << endl;
             push(CELL(line));
@@ -2280,7 +2372,7 @@ With the `builtinDefinitions` array filled, all we need to do is call
     void initializeDefinitions() {
         definitions.clear();
         definePrimitives();
-        defineBuiltins();
+        defineForthWords();
     }
     
     } // end anonymous namespace
