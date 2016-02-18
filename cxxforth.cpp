@@ -2071,19 +2071,19 @@ operations, double-cell stack operations are still very useful.
 
 ****/
 
-    ": DUP    0 PICK ;",
-    ": OVER   1 PICK ;",
-    ": SWAP   1 ROLL ;",
-    ": ROT    2 ROLL ;",
-    ": NIP    SWAP DROP ;",
-    ": TUCK   SWAP OVER ;",
-    ": 2DROP  DROP DROP ;",
-    ": 2DUP   OVER OVER ;",
-    ": 2OVER  3 PICK 3 PICK ;",
-    ": 2SWAP  3 ROLL 3 ROLL ;",
-    ": 2>R    SWAP >R >R ;",
-    ": 2R>    R> R> SWAP ;",
-    ": 2R@    R> R> 2DUP >R >R SWAP ;",
+    ": DUP     0 PICK ;",
+    ": OVER    1 PICK ;",
+    ": SWAP    1 ROLL ;",
+    ": ROT     2 ROLL ;",
+    ": NIP     SWAP DROP ;",
+    ": TUCK    SWAP OVER ;",
+    ": 2DROP   DROP DROP ;",
+    ": 2DUP    OVER OVER ;",
+    ": 2OVER   3 PICK 3 PICK ;",
+    ": 2SWAP   3 ROLL 3 ROLL ;",
+    ": 2>R     SWAP >R >R ;",
+    ": 2R>     R> R> SWAP ;",
+    ": 2R@     R> R> 2DUP >R >R SWAP ;",
 
 /****
 
@@ -2091,12 +2091,12 @@ We have a few words for incrementing/decrementing the top-of-stack value.
 
 ****/
 
-    ": 1+  1 + ;",
-    ": 1-  1 - ;",
+    ": 1+   1 + ;",
+    ": 1-   1 - ;",
 
-    ": CELL+  1 CELLS + ;",
-    ": CHAR+  1+ ;",
-    ": CHARS  ;",
+    ": CELL+   1 CELLS + ;",
+    ": CHAR+   1+ ;",
+    ": CHARS   ;",
 
 /****
 
@@ -2104,7 +2104,7 @@ We have a few words for incrementing/decrementing the top-of-stack value.
 
 ****/
 
-    ": +!  DUP >R @ + R> ! ;",
+    ": +!   DUP >R @ + R> ! ;",
 
 /****
 
@@ -2114,8 +2114,8 @@ We have a few words for incrementing/decrementing the top-of-stack value.
 
 ****/
 
-    ": ,   HERE  1 CELLS ALLOT  ! ;",
-    ": C,  HERE  1 CHARS ALLOT  C! ;",
+    ": ,    HERE  1 CELLS ALLOT  ! ;",
+    ": C,   HERE  1 CHARS ALLOT  C! ;",
 
 /****
 
@@ -2124,13 +2124,13 @@ operators.
 
 ****/
 
-    ": <>   = INVERT ;",
-    ": 0<   0 < ;",
-    ": 0>   0 > ;",
-    ": 0=   0 = ;",
-    ": 0<>  0= INVERT ;",
+    ": <>    = INVERT ;",
+    ": 0<    0 < ;",
+    ": 0>    0 > ;",
+    ": 0=    0 = ;",
+    ": 0<>   0= INVERT ;",
 
-    ": 2!  SWAP OVER ! CELL+ ! ;",
+    ": 2!   SWAP OVER ! CELL+ ! ;",
 
 /****
 
@@ -2139,8 +2139,8 @@ right.
 
 ****/
 
-    ": 2*  1 LSHIFT ;",
-    ": 2/  1 RSHIFT ;",
+    ": 2*   1 LSHIFT ;",
+    ": 2/   1 RSHIFT ;",
 
 /****
 
@@ -2148,8 +2148,8 @@ A Forth variable is just a named location in dataspace.  We'll use `CREATE` and 
 
 ****/
 
-    ": VARIABLE  CREATE 0 , ;",
-    ": ?         @ . ;",
+    ": VARIABLE   CREATE 0 , ;",
+    ": ?          @ . ;",
 
 /****
 
@@ -2159,8 +2159,8 @@ can implement this using `CREATE...DOES>`.
 
 ****/
 
-    ": CONSTANT   CREATE ,    DOES>  @ ;",
-    ": 2CONSTANT  CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
+    ": CONSTANT    CREATE ,    DOES>  @ ;",
+    ": 2CONSTANT   CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
 
 /****
 
@@ -2169,21 +2169,21 @@ size of a cell without using `1 CELLS`.
 
 ****/
 
-    "1 CELLS  CONSTANT /CELL",
+    "1 CELLS   CONSTANT /CELL",
 
-    ": DECIMAL  10 BASE ! ;",
-    ": HEX      16 BASE ! ;",
+    ": DECIMAL   10 BASE ! ;",
+    ": HEX       16 BASE ! ;",
 
-    ": [  FALSE STATE ! ; IMMEDIATE",
-    ": ]  TRUE STATE ! ;",
+    ": [   FALSE STATE ! ; IMMEDIATE",
+    ": ]   TRUE STATE ! ;",
 
-    ": '          BL WORD FIND DROP ;",
-    ": POSTPONE   ' , ; IMMEDIATE",
-    ": [']        ' POSTPONE LITERAL ; IMMEDIATE",
-    ": RECURSE    LATEST , ; IMMEDIATE",
+    ": '           BL WORD FIND DROP ;",
+    ": POSTPONE    ' , ; IMMEDIATE",  // TODO: Fix this for non-immediate words.
+    ": [']         ' POSTPONE LITERAL ; IMMEDIATE",
+    ": RECURSE     LATEST , ; IMMEDIATE",
 
-    ": CHAR    BL WORD CHAR+ C@ ;",
-    ": [CHAR]  CHAR POSTPONE LITERAL ; IMMEDIATE",
+    ": CHAR     BL WORD CHAR+ C@ ;",
+    ": [CHAR]   CHAR POSTPONE LITERAL ; IMMEDIATE",
 
 /****
 
@@ -2197,15 +2197,28 @@ See the [Control Structures[jonesforthControlStructures] section of
 
 ****/
 
-    ": IF    ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
-    ": THEN  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
-    ": ELSE  ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
+    ": IF     ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
+    ": THEN   DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
+    ": ELSE   ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
 
-    ": BEGIN   HERE ; IMMEDIATE",
-    ": AGAIN   ['] (branch) ,  HERE - , ; IMMEDIATE",
-    ": UNTIL   ['] (zbranch) ,  HERE - , ; IMMEDIATE",
-    ": WHILE   ['] (zbranch) ,  HERE 0 , ; IMMEDIATE",
-    ": REPEAT  ['] (branch) ,  SWAP HERE - ,  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
+    ": BEGIN    HERE ; IMMEDIATE",
+    ": AGAIN    ['] (branch) ,  HERE - , ; IMMEDIATE",
+    ": UNTIL    ['] (zbranch) ,  HERE - , ; IMMEDIATE",
+    ": WHILE    ['] (zbranch) ,  HERE 0 , ; IMMEDIATE",
+    ": REPEAT   ['] (branch) ,  SWAP HERE - ,  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
+
+/****
+
+Here are some more simple words we can define now that we have control structures.
+
+****/
+    
+    ": ?DUP     DUP 0<> IF DUP THEN ;",
+
+    ": ABS      DUP 0 < IF NEGATE THEN ;",
+
+    ": SPACE    BL EMIT ;",
+    ": SPACES   BEGIN  DUP 0> WHILE  SPACE 1-  REPEAT  DROP ;",
 
 /****
 
@@ -2235,19 +2248,27 @@ This word prints the given string.  We can implement it in terms of `S"` and
 
 ****/
 
-    ": S\"  [CHAR] \" PARSE",
-    "       STATE @ IF",
-    "           >R",
-    "           ['] (branch) , HERE >R 0 ,",  // compile a branch with dummy offset
-    "           R> R> 2DUP >R >R",
-    "           SWAP CELL+ SWAP",             // copy into the first byte after the offset
-    "           DUP ALLOT  CMOVE ALIGN",      // allocate dataspace and copy string into it
-    "           R> DUP POSTPONE THEN",        // resolve the branch
-    "           CELL+ POSTPONE LITERAL",      // compile literal for address
-    "           R> POSTPONE LITERAL",         // compile literal for length
-    "       THEN ; IMMEDIATE",
+    ": S\"   [CHAR] \" PARSE",
+    "        STATE @ IF",
+    "            >R",
+    "            ['] (branch) , HERE >R 0 ,",  // compile a branch with dummy offset
+    "            R> R> 2DUP >R >R",
+    "            SWAP CELL+ SWAP",             // copy into the first byte after the offset
+    "            DUP ALLOT  CMOVE ALIGN",      // allocate dataspace and copy string into it
+    "            R> DUP POSTPONE THEN",        // resolve the branch
+    "            CELL+ POSTPONE LITERAL",      // compile literal for address
+    "            R> POSTPONE LITERAL",         // compile literal for length
+    "        THEN ; IMMEDIATE",
 
-    ": .\"  POSTPONE S\" ['] TYPE , ; IMMEDIATE",
+    ": .\"   POSTPONE S\" ['] TYPE , ; IMMEDIATE",
+
+    ": ABORT\"   POSTPONE S\"",
+    "            ['] ROT ,",
+    "            POSTPONE IF",
+    "            ['] ABORT-MESSAGE ,",
+    "            POSTPONE THEN",
+    "            ['] 2DROP ,",
+    "; IMMEDIATE",
 
 /****
 
@@ -2275,9 +2296,9 @@ To-Do: `(` should support comments that span lines.
 
 ****/
 
-    ": \\  SOURCE NIP >IN ! ; IMMEDIATE",
-    ": #!  POSTPONE \\ ; IMMEDIATE",
-    ": (   [CHAR] ) PARSE 2DROP ; IMMEDIATE",
+    ": \\   SOURCE NIP >IN ! ; IMMEDIATE",
+    ": #!   POSTPONE \\ ; IMMEDIATE",
+    ": (    [CHAR] ) PARSE 2DROP ; IMMEDIATE",
 
 /****
 
