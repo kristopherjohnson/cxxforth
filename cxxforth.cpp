@@ -1369,22 +1369,15 @@ void exit() {
     throw runtime_error("EXIT should not be executed");
 }
 
-// (literal) ( -- x )
+// (lit) ( -- x )
 //
 // Not an ANS Forth word.
 //
 // Compiled by LITERAL.
 void doLiteral() {
-    REQUIRE_DSTACK_AVAILABLE(1, "(literal)");
+    REQUIRE_DSTACK_AVAILABLE(1, "(lit)");
     push(CELL(*next));
     ++next;
-}
-
-// LITERAL Compilation: ( x -- )  Runtime: ( -- x )
-void literal() {
-    REQUIRE_DSTACK_DEPTH(1, "LITERAL");
-    data(CELL(doLiteralXt));
-    data(*dTop); pop();
 }
 
 // (branch) ( -- )
@@ -1929,7 +1922,6 @@ void definePrimitives() {
         {";",             semicolon},
         {"DOES>",         does},
         {"IMMEDIATE",     immediate},
-        {"LITERAL",       literal},
     };
     for (auto& w: immediateCodeWords) {
         defineCodeWord(w.name, w.code);
@@ -1947,7 +1939,7 @@ void definePrimitives() {
         {"(zbranch)",     zbranch},
         {"(branch)",      branch},
         {"(does)",        setDoes},
-        {"(literal)",     doLiteral},
+        {"(lit)",         doLiteral},
         {"(;)",           endOfDefinition},
         {"*",             star},
         {"+",             plus},
@@ -2030,8 +2022,8 @@ void definePrimitives() {
         defineCodeWord(w.name, w.code);
     }
 
-    doLiteralXt = findDefinition("(literal)");
-    if (doLiteralXt == nullptr) throw runtime_error("Can't find (literal) in kernel dictionary");
+    doLiteralXt = findDefinition("(lit)");
+    if (doLiteralXt == nullptr) throw runtime_error("Can't find (lit) in kernel dictionary");
 
     setDoesXt = findDefinition("(does)");
     if (setDoesXt == nullptr) throw runtime_error("Can't find (does) in kernel dictionary");
@@ -2171,19 +2163,64 @@ size of a cell without using `1 CELLS`.
 
     "1 CELLS   CONSTANT /CELL",
 
+/****
+
+`DECIMAL` and `HEX` will switch the numeric base to 10 or 16, respectively.
+
+****/
+
     ": DECIMAL   10 BASE ! ;",
     ": HEX       16 BASE ! ;",
 
-    ": [   FALSE STATE ! ; IMMEDIATE",
-    ": ]   TRUE STATE ! ;",
+/****
 
-    ": '           BL WORD FIND DROP ;",
-    ": POSTPONE    ' , ; IMMEDIATE",  // TODO: Fix this for non-immediate words.
-    ": [']         ' POSTPONE LITERAL ; IMMEDIATE",
+`]` enters compilation mode.
+
+`[` exits compilation mode.
+
+****/
+
+    ": ]   TRUE STATE ! ;",
+    ": [   FALSE STATE ! ; IMMEDIATE",
+
+/****
+
+`'` gets the next word from the input stream and looks up its execution token.
+
+****/
+
+    ": '   BL WORD FIND DROP ;",
+
+/****
+
+The word `LITERAL` takes a cell from the stack at compile time, and at runtime will put that value onto the stack.
+We implement this by compiling a call to `(lit)` word followed by the value.
+
+Because we'll be using `(lit)` in other word definitions, we'll create a constant `'(lit)` containing its XT.
+
+****/
+
+    "' (lit)  constant '(lit)",
+    ": LITERAL  '(lit) , , ; IMMEDIATE",
+
+/****
+
+`[']` is like `'`, but causes the XT to be put on the stack at runtime.
+
+****/
+
+    ": [']   ' '(lit) , , ; IMMEDIATE",
+
+/****
+
+`RECURSE` compiles a call to the word currently being defined.
+
+****/
+
     ": RECURSE     LATEST , ; IMMEDIATE",
 
     ": CHAR     BL WORD CHAR+ C@ ;",
-    ": [CHAR]   CHAR POSTPONE LITERAL ; IMMEDIATE",
+    ": [CHAR]   CHAR '(lit) , , ; IMMEDIATE",
 
 /****
 
@@ -2247,6 +2284,8 @@ This word prints the given string.  We can implement it in terms of `S"` and
 `TYPE`.
 
 ****/
+
+    ": POSTPONE    ' , ; IMMEDIATE",  // TODO: Fix this for non-immediate words.
 
     ": S\"   [CHAR] \" PARSE",
     "        STATE @ IF",
