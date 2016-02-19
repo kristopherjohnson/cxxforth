@@ -4,6 +4,8 @@ cxxforth: A Simple Forth Implementation in C++
 
 by Kristopher Johnson
 
+<https://github.com/kristopherjohnson/cxxforth>
+
 ----
 
 This is free and unencumbered software released into the public domain.
@@ -71,7 +73,7 @@ for real-world applications.  Forth was originally designed to be something
 simple you could build yourself and extend and customize as needed to solve
 your problem.  I hope people can use cxxforth like that.
 
-It is assumed that the reader has some familiarity in C++ and Forth.  You may
+It is assumed that the reader has some familiarity with C++ and Forth.  You may
 want to first read the JONESFORTH source or the source of some other Forth
 implementation to get the basic gist of how Forth is usually implemented.
 
