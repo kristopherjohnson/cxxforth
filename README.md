@@ -1910,7 +1910,7 @@ top-level loop.
             catch (const AbortException& abortEx) {
                 string msg(abortEx.what());
                 if (msg.length() > 0) {
-                    cout << "<<< Error: " << msg << " >>>" << endl;
+                    cout << "<<< " << msg << " >>>" << endl;
                 }
                 resetDStack();
                 resetRStack();
@@ -2492,6 +2492,20 @@ This word prints the given string.  We can implement it in terms of `S"` and
         "; IMMEDIATE",
     
 
+Here are some additional file-access words.
+
+    
+    #ifndef CXXFORTH_DISABLE_FILE_ACCESS
+    
+        ": INCLUDED",
+        "    R/O OPEN-FILE  ABORT\" INCLUDED: unable to open file\"",
+        "    DUP INCLUDE-FILE",
+        "    CLOSE-FILE  ABORT\" INCLUDED: unable to close file\"",
+        ";",
+    
+    #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
+    
+
 Comments
 --------
 
@@ -2512,7 +2526,7 @@ UNIX shell script with something like this:
 Note that a space is required after the `\`, `(`, or `#!` that starts a
 comment.  They are blank-delimited words just like every other Forth word.
 
-To-Do: `(` should support comments that span lines.
+To-Do: `(` should support multi-line comments.
 
     
         ": \\   SOURCE NIP >IN ! ; IMMEDIATE",
@@ -2520,7 +2534,7 @@ To-Do: `(` should support comments that span lines.
         ": (    [CHAR] ) PARSE 2DROP ; IMMEDIATE",
     
 
-`ABOUT` is not an ANS Forth.  It just prints licensing and credit information.
+`ABOUT` is not an ANS Forth word.  It just prints licensing and credit information.
 
     
         ": ABOUT",
