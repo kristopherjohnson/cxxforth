@@ -43,10 +43,11 @@ build a working Forth system in a couple thousand lines of code.
 An inspiration for this implementation is Richard W.M. Jones's
 [JONESFORTH][jonesforth].  JONESFORTH is a Forth implementation written as a
 very readable tutorial, and I am adopting its style for our higher-level
-implementation.  This Forth kernel is written as C++ file with large comment
-blocks, and there is a utility, `cpp2md`, that takes that C++ file and converts
-it to a [Markdown][markdown] format document named "README.md" with nicely
-formatted commentary sections between the C++ code blocks.
+implementation.  This Forth kernel is written as a [C++ file](cxxforth.cpp)
+with large comment blocks, and there is a utility, [cpp2md](cpp2md.cpp.md),
+that takes that C++ file and converts it to a [Markdown][markdown]-format
+document [cxxforth.cpp.md](cxxforth.cpp.md) with nicely formatted commentary
+sections between the C++ code blocks.
 
 As in other Forth systems, the basic design of this Forth is to create a small
 kernel in native code (C++, in this case), and then implement the rest of the
@@ -1295,7 +1296,7 @@ compiled Forth definitions.  I will start with the inner interpreter.
 
 There are basically two kinds of words in a Forth system:
 
-- primitive code: native code fragments that are executed directly by the CPU
+- primitive code: native subroutines that are executed directly by the CPU
 - colon definition: a sequence of Forth words compiled by `:` (colon), `:NONAME`, or `DOES>`.
 
 Every defined word has a `code` field that points to native code.  In the case
