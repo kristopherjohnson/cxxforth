@@ -2756,7 +2756,7 @@ To-Do: `(` should support multi-line comments.
     "      .\" ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\" CR",
     "      .\" WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\" CR",
     "      CR",
-    "      .\" For more, visit <https://bitbucket.org/KristopherJohnson/cxxforth>.\" CR",
+    "      .\" For more, visit <https://github.com/kristopherjohnson/cxxforth>.\" CR",
     ";",
 };
 
