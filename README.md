@@ -134,6 +134,11 @@ We start by including headers from the C++ Standard Library.  We also include
     #include <string>
     #include <thread>
     
+    #ifndef CXXFORTH_DISABLE_FILE_ACCESS
+    #include <cstdio>
+    #include <fstream>
+    #endif
+    
     using std::cerr;
     using std::cout;
     using std::endl;
@@ -1920,6 +1925,188 @@ top-level loop.
     }
     
 
+File Access Words
+-----------------
+
+One of my goals is to make cxxforth useful for writing simple shell-like
+scripts and utilities, and so being able to read and write files and execute
+Forth scripts are necessities.  So I am providing a subset of the [File-Access
+and File-Access extension wordsets][dpansFileAccess] from the ANS Forth draft
+standard.
+
+[dpansFileAccess]: http://forth.sourceforge.net/std/dpans/dpans11.htm "File Access words"
+
+As with our user input, we'll use C++ iostreams to implement the file access
+words.  This means that a Forth _fileid_ is going to be a pointer to a
+`std::fstream` instance.
+
+On some platforms, the C++ iostreams library may be unavailable or incomplete,
+or the overhead of linking in these words may be too great.  In that case,
+define the macro `CXXFORTH_DISABLE_FILE_ACCESS` to disable compilation of these
+words.
+
+Words related to file position and size have undefined results if the size of a
+file is greater than the maximum value that can be stored in a cell.
+
+    
+    #ifndef CXXFORTH_DISABLE_FILE_ACCESS
+    
+    #define FILEID(x) reinterpret_cast<std::fstream*>(x)
+    
+    // R/O ( -- fam )
+    void readOnly() {
+        REQUIRE_DSTACK_AVAILABLE(1, "R/O");
+        push(static_cast<Cell>(std::ios_base::in));
+    }
+    
+    // R/W ( -- fam )
+    void readWrite() {
+        REQUIRE_DSTACK_AVAILABLE(1, "R/W");
+        push(static_cast<Cell>(std::ios_base::in | std::ios_base::out));
+    }
+    
+    // W/O ( -- fam )
+    void writeOnly() {
+        REQUIRE_DSTACK_AVAILABLE(1, "W/O");
+        push(static_cast<Cell>(std::ios_base::out));
+    }
+    
+    // BIN ( fam1 -- fam2 )
+    void bin() {
+        REQUIRE_DSTACK_DEPTH(1, "BIN");
+        *dTop = *dTop | static_cast<Cell>(std::ios_base::binary);
+    }
+    
+    // CREATE-FILE ( c-addr u fam -- fileid ior )
+    void createFile() {
+        REQUIRE_DSTACK_DEPTH(3, "CREATE-FILE");
+    
+        auto caddr = CHARPTR(*(dTop - 2));
+        auto length = SIZE_T(*(dTop - 1));
+        auto fam = static_cast<std::ios_base::openmode>(*dTop); pop();
+    
+        string filename(caddr, length);
+        auto f = new std::fstream(filename, fam | std::ios_base::trunc);
+        if (f->is_open()) {
+            *(dTop - 1) = CELL(f);
+            *dTop = 0;
+        }
+        else {
+            delete f;
+            *(dTop - 1) = 0;
+            *dTop = Cell(-1);
+        }
+    }
+    
+    // OPEN-FILE ( c-addr u fam -- fileid ior )
+    void openFile() {
+        REQUIRE_DSTACK_DEPTH(3, "OPEN-FILE");
+    
+        auto caddr = CHARPTR(*(dTop - 2));
+        auto length = SIZE_T(*(dTop - 1));
+        auto fam = static_cast<std::ios_base::openmode>(*dTop); pop();
+    
+        string filename(caddr, length);
+        auto f = new std::fstream(filename, fam);
+        if (f->is_open()) {
+            *(dTop - 1) = CELL(f);
+            *dTop = 0;
+        }
+        else {
+            delete f;
+            *(dTop - 1) = 0;
+            *dTop = Cell(-1);
+        }
+    }
+    
+    // READ-FILE ( c-addr u1 fileid -- u2 ior )
+    void readFile() {
+        REQUIRE_DSTACK_DEPTH(3, "READ-FILE");
+        auto f = FILEID(*dTop); pop();
+        if (f == nullptr) throw AbortException("READ-FILE: not a valid file ID");
+        auto length = SIZE_T(*dTop);
+        auto caddr = CHARPTR(*(dTop - 1));
+        f->read(caddr, static_cast<std::streamsize>(length));
+        *dTop = f->bad() ? Cell(-1) : 0;
+        *(dTop - 1) = static_cast<Cell>(f->gcount());
+    }
+    
+    // WRITE-FILE ( c-addr u fileid -- ior )
+    void writeFile() {
+        REQUIRE_DSTACK_DEPTH(3, "WRITE-FILE");
+        auto f = FILEID(*dTop); pop();
+        if (f == nullptr) throw AbortException("WRITE-FILE: not a valid file ID");
+        auto length = SIZE_T(*dTop); pop();
+        auto caddr = CHARPTR(*dTop);
+        f->write(caddr, static_cast<std::streamsize>(length));
+        *dTop = f->bad() ? Cell(-1) : 0;
+    }
+    
+    // FLUSH-FILE ( fileid -- ior )
+    void flushFile() {
+        REQUIRE_DSTACK_DEPTH(1, "FLUSH-FILE");
+        auto f = FILEID(*dTop);
+        if (f == nullptr) throw AbortException("FLUSH-FILE: not a valid file ID");
+        f->flush();
+        *dTop = f->bad() ? Cell(-1) : 0;
+    }
+    
+    // CLOSE-FILE ( fileid -- ior )
+    void closeFile() {
+        REQUIRE_DSTACK_DEPTH(1, "CLOSE-FILE");
+        auto f = FILEID(*dTop);
+        if (f == nullptr) throw AbortException("CLOSE-FILE: not a valid file ID");
+        f->close();
+        delete f;
+        *dTop = 0;
+    }
+    
+    // DELETE-FILE ( c-addr u -- ior )
+    void deleteFile() {
+        REQUIRE_DSTACK_DEPTH(2, "DELETE-FILE");
+    
+        auto caddr = CHARPTR(*(dTop - 1));
+        auto length = SIZE_T(*dTop); pop();
+    
+        string filename(caddr, length);
+        auto result = std::remove(filename.c_str());
+        *dTop = static_cast<Cell>(result);
+    }
+    
+    // RENAME-FILE ( c-addr1 u1 c-addr2 u2 -- ior )
+    void renameFile() {
+        REQUIRE_DSTACK_DEPTH(4, "RENAME-FILE");
+    
+        auto lengthNew = SIZE_T(*dTop); pop();
+        auto caddrNew = CHARPTR(*dTop); pop();
+        auto lengthOld = SIZE_T(*dTop); pop();
+        auto caddrOld = CHARPTR(*dTop);
+    
+        string oldName(caddrOld, lengthOld);
+        string newName(caddrNew, lengthNew);
+        auto result = std::rename(oldName.c_str(), newName.c_str());
+    
+        *dTop = static_cast<Cell>(result);
+    }
+    
+    // INCLUDE-FILE ( i*x fileid -- j*x )
+    void includeFile() {
+        REQUIRE_DSTACK_DEPTH(1, "INCLUDE-FILE");
+    
+        auto f = FILEID(*dTop); pop();
+        if (f == nullptr) throw AbortException("INCLUDE-FILE: invalid file ID");
+    
+        string line;
+        while (std::getline(*f, line)) {
+            push(CELL(line.data()));
+            push(static_cast<Cell>(line.length()));
+            evaluate();
+        }
+    }
+    
+    #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
+    
+
 Initialization
 --------------
 
@@ -1933,11 +2120,11 @@ working system.
             const char* name;
             Code code;
         } immediateCodeWords[] = {
-            // name           code
+            // name             code
             // ------------------------------
-            {";",             semicolon},
-            {"DOES>",         does},
-            {"IMMEDIATE",     immediate},
+            {";",               semicolon},
+            {"DOES>",           does},
+            {"IMMEDIATE",       immediate},
         };
         for (auto& w: immediateCodeWords) {
             defineCodeWord(w.name, w.code);
@@ -1950,89 +2137,104 @@ working system.
         } codeWords[] = {
             // name           code
             // ------------------------------
-            {"!",             store},
-            {"#ARG",          argCount},
-            {"(zbranch)",     zbranch},
-            {"(branch)",      branch},
-            {"(does)",        setDoes},
-            {"(lit)",         doLiteral},
-            {"(;)",           endOfDefinition},
-            {"*",             star},
-            {"+",             plus},
-            {"-",             minus},
-            {".",             dot},
-            {".RS",           dotRS},
-            {".S",            dotS},
-            {"/",             slash},
-            {"/MOD",          slashMod},
-            {":",             colon},
-            {":NONAME",       noname},
-            {"<",             lessThan},
-            {"=",             equals},
-            {">",             greaterThan},
-            {">BODY",         toBody},
-            {">IN",           toIn},
-            {">NUM",          parseSignedNumber},
-            {">R",            toR},
-            {">UNUM",         parseUnsignedNumber},
-            {"@",             fetch},
-            {"ABORT",         abort},
-            {"ABORT-MESSAGE", abortMessage},
-            {"ALIGN",         align},
-            {"ALIGNED",       aligned},
-            {"ALLOT",         allot},
-            {"AND",           bitwiseAnd},
-            {"ARG",           argAtIndex},
-            {"BASE",          base},
-            {"BL",            bl},
-            {"BYE",           bye},
-            {"C!",            cstore},
-            {"C@",            cfetch},
-            {"CELLS",         cells},
-            {"CMOVE",         cMove},
-            {"CMOVE>",        cMoveUp},
-            {"COUNT",         count},
-            {"CR",            cr},
-            {"CREATE",        create},
-            {"DEPTH",         depth},
-            {"DROP",          drop},
-            {"EMIT",          emit},
-            {"EVALUATE",      evaluate},
-            {"EXECUTE",       execute},
-            {"EXIT",          exit},
-            {"FALSE",         pushFalse},
-            {"FIND",          find},
-            {"HERE",          here},
-            {"HIDDEN",        hidden},
-            {"INTERPRET",     interpret},
-            {"INVERT",        invert},
-            {"LATEST",        latest},
-            {"LSHIFT",        lshift},
-            {"MS",            ms},
-            {"NEGATE",        negate},
-            {"OR",            bitwiseOr},
-            {"PARSE",         parse},
-            {"PICK",          pick},
-            {"PROMPT",        prompt},
-            {"QUIT",          quit},
-            {"R>",            rFrom},
-            {"R@",            rFetch},
-            {"REFILL",        refill},
-            {"ROLL",          roll},
-            {"RSHIFT",        rshift},
-            {"SEE",           see},
-            {"SOURCE",        source},
-            {"STATE",         state},
-            {"TIME&DATE",     timeAndDate},
-            {"TRUE",          pushTrue},
-            {"TYPE",          type},
-            {"U.",            uDot},
-            {"UNUSED",        unused},
-            {"UTCTIME&DATE",  utcTimeAndDate},
-            {"WORD",          word},
-            {"WORDS",         words},
-            {"XT>NAME",       xtToName},
-            {"XOR",           bitwiseXor},
+            {"!",               store},
+            {"#ARG",            argCount},
+            {"(zbranch)",       zbranch},
+            {"(branch)",        branch},
+            {"(does)",          setDoes},
+            {"(lit)",           doLiteral},
+            {"(;)",             endOfDefinition},
+            {"*",               star},
+            {"+",               plus},
+            {"-",               minus},
+            {".",               dot},
+            {".RS",             dotRS},
+            {".S",              dotS},
+            {"/",               slash},
+            {"/MOD",            slashMod},
+            {":",               colon},
+            {":NONAME",         noname},
+            {"<",               lessThan},
+            {"=",               equals},
+            {">",               greaterThan},
+            {">BODY",           toBody},
+            {">IN",             toIn},
+            {">NUM",            parseSignedNumber},
+            {">R",              toR},
+            {">UNUM",           parseUnsignedNumber},
+            {"@",               fetch},
+            {"ABORT",           abort},
+            {"ABORT-MESSAGE",   abortMessage},
+            {"ALIGN",           align},
+            {"ALIGNED",         aligned},
+            {"ALLOT",           allot},
+            {"AND",             bitwiseAnd},
+            {"ARG",             argAtIndex},
+            {"BASE",            base},
+            {"BL",              bl},
+            {"BYE",             bye},
+            {"C!",              cstore},
+            {"C@",              cfetch},
+            {"CELLS",           cells},
+            {"CMOVE",           cMove},
+            {"CMOVE>",          cMoveUp},
+            {"COUNT",           count},
+            {"CR",              cr},
+            {"CREATE",          create},
+            {"DEPTH",           depth},
+            {"DROP",            drop},
+            {"EMIT",            emit},
+            {"EVALUATE",        evaluate},
+            {"EXECUTE",         execute},
+            {"EXIT",            exit},
+            {"FALSE",           pushFalse},
+            {"FIND",            find},
+            {"HERE",            here},
+            {"HIDDEN",          hidden},
+            {"INTERPRET",       interpret},
+            {"INVERT",          invert},
+            {"LATEST",          latest},
+            {"LSHIFT",          lshift},
+            {"MS",              ms},
+            {"NEGATE",          negate},
+            {"OR",              bitwiseOr},
+            {"PARSE",           parse},
+            {"PICK",            pick},
+            {"PROMPT",          prompt},
+            {"QUIT",            quit},
+            {"R>",              rFrom},
+            {"R@",              rFetch},
+            {"REFILL",          refill},
+            {"ROLL",            roll},
+            {"RSHIFT",          rshift},
+            {"SEE",             see},
+            {"SOURCE",          source},
+            {"STATE",           state},
+            {"TIME&DATE",       timeAndDate},
+            {"TRUE",            pushTrue},
+            {"TYPE",            type},
+            {"U.",              uDot},
+            {"UNUSED",          unused},
+            {"UTCTIME&DATE",    utcTimeAndDate},
+            {"WORD",            word},
+            {"WORDS",           words},
+            {"XT>NAME",         xtToName},
+            {"XOR",             bitwiseXor},
+    #ifndef CXXFORTH_DISABLE_FILE_ACCESS
+            {"BIN",             bin},
+            {"CLOSE-FILE",      closeFile},
+            {"CREATE-FILE",     createFile},
+            {"DELETE-FILE",     deleteFile},
+            {"FLUSH-FILE",      flushFile},
+            {"INCLUDE-FILE",    includeFile},
+            {"OPEN-FILE",       openFile},
+            {"R/O",             readOnly},
+            {"R/W",             readWrite},
+            {"READ-FILE",       readFile},
+            {"RENAME-FILE",     renameFile},
+            {"W/O",             writeOnly},
+            {"WRITE-FILE",      writeFile},
+    #endif
         };
         for (auto& w: codeWords) {
             defineCodeWord(w.name, w.code);
@@ -2239,7 +2441,7 @@ Here are some more words we can define now that we have control structures.
         ": SPACE      BL EMIT ;",
         ": SPACES     BEGIN  DUP 0> WHILE  SPACE 1-  REPEAT  DROP ;",
     
-        ": POSTPONE   BL WORD FIND  1 = IF , ELSE '(lit) , , ['] , , THEN ; IMMEDIATE",
+        ": POSTPONE   BL WORD FIND  1 = IF , ELSE  '(lit) , ,  ['] , ,  THEN ; IMMEDIATE",
     
 
 Strings
