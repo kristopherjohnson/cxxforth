@@ -1584,7 +1584,7 @@ look up elements by name, or traverse the list to perform some operation.
 ****/
 
 // Create a new definition with specified name and code.
-void defineCodeWord(const char* name, Code code) {
+void definePrimitive(const char* name, Code code) {
     alignDataPointer();
 
     Definition defn;
@@ -2126,6 +2126,20 @@ void writeFile() {
     *dTop = f->bad() ? Cell(-1) : 0;
 }
 
+// WRITE-CHAR ( char fileid -- ior )
+//
+// Not an ANS Forth word.
+//
+// Writes a single character to the specified file.
+void writeChar() {
+    REQUIRE_DSTACK_DEPTH(2, "WRITE-CHAR");
+    auto f = FILEID(*dTop); pop();
+    if (f == nullptr) throw AbortException("WRITE-CHAR: not a valid file ID");
+    auto ch = static_cast<char>(*dTop);
+    f->put(ch);
+    *dTop = f->bad() ? Cell(-1) : 0;
+}
+
 // FLUSH-FILE ( fileid -- ior )
 void flushFile() {
     REQUIRE_DSTACK_DEPTH(1, "FLUSH-FILE");
@@ -2213,7 +2227,7 @@ void definePrimitives() {
         {"IMMEDIATE",       immediate},
     };
     for (auto& w: immediateCodeWords) {
-        defineCodeWord(w.name, w.code);
+        definePrimitive(w.name, w.code);
         immediate();
     }
 
@@ -2319,11 +2333,12 @@ void definePrimitives() {
         {"READ-FILE",       readFile},
         {"RENAME-FILE",     renameFile},
         {"W/O",             writeOnly},
+        {"WRITE-CHAR",      writeChar},
         {"WRITE-FILE",      writeFile},
 #endif
     };
     for (auto& w: codeWords) {
-        defineCodeWord(w.name, w.code);
+        definePrimitive(w.name, w.code);
     }
 
     doLiteralXt = findDefinition("(lit)");
@@ -2627,6 +2642,12 @@ Here are some additional file-access words.
     "    R/O OPEN-FILE  ABORT\" INCLUDED: unable to open file\"",
     "    DUP INCLUDE-FILE",
     "    CLOSE-FILE  ABORT\" INCLUDED: unable to close file\"",
+    ";",
+
+    ": WRITE-LINE",
+    "    DUP >R",
+    "    WRITE-FILE  ABORT\" WRITE-LINE: write failed\"",
+    "    10 R> WRITE-CHAR",
     ";",
 
 #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
