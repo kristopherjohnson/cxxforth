@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4E0589E01C77262300D4E3C6 /* libreadline.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E0589DF1C77262300D4E3C6 /* libreadline.a */; };
 		4E90D4C01C67DD590064FE48 /* cxxforth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4E90D4BE1C67DD590064FE48 /* cxxforth.cpp */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +24,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4E0589DF1C77262300D4E3C6 /* libreadline.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libreadline.a; path = ../../../../../usr/local/Cellar/readline/6.3.8/lib/libreadline.a; sourceTree = "<group>"; };
 		4E534CEB1C5B031800E32758 /* cxxforth */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cxxforth; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E534CF51C5B03A400E32758 /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = CMakeLists.txt; path = ../CMakeLists.txt; sourceTree = "<group>"; };
 		4E534CF91C5B03A400E32758 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; name = Makefile; path = ../Makefile; sourceTree = "<group>"; };
@@ -37,6 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E0589E01C77262300D4E3C6 /* libreadline.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -46,6 +49,7 @@
 		4E534CE21C5B031700E32758 = {
 			isa = PBXGroup;
 			children = (
+				4E0589DF1C77262300D4E3C6 /* libreadline.a */,
 				4E534CFF1C5B03C100E32758 /* cxxforth */,
 				4E534CEC1C5B031800E32758 /* Products */,
 			);
@@ -217,6 +221,10 @@
 		4E534CF31C5B031800E32758 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/readline/6.3.8/lib,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -224,6 +232,10 @@
 		4E534CF41C5B031800E32758 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/readline/6.3.8/lib,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

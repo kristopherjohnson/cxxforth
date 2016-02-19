@@ -2115,6 +2115,35 @@ void readFile() {
     *(dTop - 1) = static_cast<Cell>(f->gcount());
 }
 
+// READ-LINE ( c-addr u1 fileid -- u2 ior )
+void readLine() {
+    REQUIRE_DSTACK_DEPTH(3, "READ-FILE");
+    auto f = FILEID(*dTop); pop();
+    if (f == nullptr) throw AbortException("READ-FILE: not a valid file ID");
+    auto length = SIZE_T(*dTop);
+    auto caddr = CHARPTR(*(dTop - 1));
+    f->getline(caddr, static_cast<std::streamsize>(length));
+    *dTop = f->bad() ? Cell(-1) : 0;
+    *(dTop - 1) = static_cast<Cell>(f->gcount());
+}
+
+// READ-CHAR ( fileid -- char ior )
+//
+// Not an ANS Forth word.
+//
+// Reads a single character from the specified file.
+// On success, ior is 0 and char is the character read.
+// On failure, ior is non-zero and char is undefined.
+void readChar() {
+    REQUIRE_DSTACK_DEPTH(1, "READ-CHAR");
+    REQUIRE_DSTACK_AVAILABLE(1, "READ-CHAR");
+    auto f = FILEID(*dTop);
+    if (f == nullptr) throw AbortException("READ-CHAR: not a valid file ID");
+    auto ch = static_cast<unsigned char>(f->get());
+    *dTop = static_cast<Cell>(ch);
+    if (f->bad()) push(static_cast<Cell>(-1)); else push(0);
+}
+
 // WRITE-FILE ( c-addr u fileid -- ior )
 void writeFile() {
     REQUIRE_DSTACK_DEPTH(3, "WRITE-FILE");
@@ -2123,6 +2152,18 @@ void writeFile() {
     auto length = SIZE_T(*dTop); pop();
     auto caddr = CHARPTR(*dTop);
     f->write(caddr, static_cast<std::streamsize>(length));
+    *dTop = f->bad() ? Cell(-1) : 0;
+}
+
+// WRITE-LINE ( c-addr u fileid -- ior )
+void writeLine() {
+    REQUIRE_DSTACK_DEPTH(3, "WRITE-LINE");
+    auto f = FILEID(*dTop); pop();
+    if (f == nullptr) throw AbortException("WRITE-FILE: not a valid file ID");
+    auto length = SIZE_T(*dTop); pop();
+    auto caddr = CHARPTR(*dTop);
+    f->write(caddr, static_cast<std::streamsize>(length));
+    (*f) << endl;
     *dTop = f->bad() ? Cell(-1) : 0;
 }
 
@@ -2330,11 +2371,14 @@ void definePrimitives() {
         {"OPEN-FILE",       openFile},
         {"R/O",             readOnly},
         {"R/W",             readWrite},
+        {"READ-CHAR",       readChar},
         {"READ-FILE",       readFile},
+        {"READ-LINE",       readLine},
         {"RENAME-FILE",     renameFile},
         {"W/O",             writeOnly},
         {"WRITE-CHAR",      writeChar},
         {"WRITE-FILE",      writeFile},
+        {"WRITE-LINE",      writeLine},
 #endif
     };
     for (auto& w: codeWords) {
@@ -2632,7 +2676,12 @@ This word prints the given string.  We can implement it in terms of `S"` and
 
 /****
 
-Here are some additional file-access words.
+`INCLUDED` is the word for reading additional source files. For example, you
+can include the file `tests/hello.fs` and then run its `hello` word by doing
+the following:
+
+    s" tests/hello.fs" INCLUDED
+    hello
 
 ****/
 
@@ -2642,12 +2691,6 @@ Here are some additional file-access words.
     "    R/O OPEN-FILE  ABORT\" INCLUDED: unable to open file\"",
     "    DUP INCLUDE-FILE",
     "    CLOSE-FILE  ABORT\" INCLUDED: unable to close file\"",
-    ";",
-
-    ": WRITE-LINE",
-    "    DUP >R",
-    "    WRITE-FILE  ABORT\" WRITE-LINE: write failed\"",
-    "    10 R> WRITE-CHAR",
     ";",
 
 #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
