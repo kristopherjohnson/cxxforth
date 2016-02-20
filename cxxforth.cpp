@@ -950,6 +950,13 @@ We keep things simple and portable by using C++ iostream objects.
 
 ****/
 
+// KEY ( -- char )
+void key() {
+    REQUIRE_DSTACK_AVAILABLE(1, "KEY");
+    auto ch = static_cast<Cell>(std::cin.get());
+    push(ch);
+}
+
 // EMIT ( x -- )
 void emit() {
     REQUIRE_DSTACK_DEPTH(1, "EMIT");
@@ -2371,6 +2378,7 @@ void definePrimitives() {
         {"here",            here},
         {"hidden",          hidden},
         {"interpret",       interpret},
+        {"key",             key},
         {"latest",          latest},
         {"lshift",          lshift},
         {"ms",              ms},
