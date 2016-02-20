@@ -2591,13 +2591,14 @@ This word prints the given string.  We can implement it in terms of `S"` and
     
         ": .\"   POSTPONE S\" POSTPONE TYPE ; IMMEDIATE",
     
-        ": ABORT\"   POSTPONE S\"",
-        "            POSTPONE ROT",
-        "            POSTPONE IF",
-        "            POSTPONE ABORT-MESSAGE",
-        "            POSTPONE THEN",
-        "            POSTPONE 2DROP",
-        "; IMMEDIATE",
+
+`ABORT"` checks whether a result is non-zero, and if so, it throws an exception
+that will be caught by `QUIT`, which will print the given message and then
+continue the interpreter loop.
+
+    
+        ": (ABORT\")   ROT IF ABORT-MESSAGE THEN 2DROP ;",
+        ": ABORT\"     POSTPONE S\" POSTPONE (ABORT\") ; IMMEDIATE",
     
 
 `INCLUDED` is the word for reading additional source files. For example, you
@@ -2687,6 +2688,7 @@ into `MAIN`.
 
     
         "DEFER MAIN",
+    
         "' QUIT IS MAIN",
     };
     
