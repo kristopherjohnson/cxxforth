@@ -31,7 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ----
 
-`cxxforth` is a simple implementation of a [Forth][forth] system in C++.
+`cxxforth` is a simple implementation of [Forth][forth] in C++.
 
 There are many examples of Forth implementations available on the Internet, but
 most of them are written in assembly language or low-level C, with a focus in
@@ -41,7 +41,7 @@ Forth implementation that is easy to understand, easy to port, and easy to
 extend.  I'm not going to talk about register assignments or addressing modes
 or opcodes or the trade-offs between indirect threaded code, direct threaded
 code, subroutine threaded code, and token threaded code.  I'm just going to
-build a working Forth system in a couple thousand lines of code.
+build a working Forth system in a couple thousand lines of C++.
 
 An inspiration for this implementation is Richard W.M. Jones's
 [JONESFORTH][jonesforth].  JONESFORTH is a Forth implementation written as a
@@ -1017,10 +1017,51 @@ void refill() {
 #else
     if (std::getline(std::cin, sourceBuffer)) {
         sourceOffset = 0;
-        pushTrue();
+        push(True);
     }
     else {
-        pushFalse();
+        push(False);
+    }
+#endif
+}
+
+/****
+
+`ACCEPT` is similar to `REFILL`, but puts the result into a caller-supplied
+buffer.
+
+****/
+
+// ACCEPT ( c-addr +n1 -- +n2 )
+void accept() { 
+    REQUIRE_DSTACK_AVAILABLE(2, "ACCEPT");
+
+    auto bufferSize = SIZE_T(*dTop); pop();
+    auto buffer = CHARPTR(*dTop);
+
+#ifdef CXXFORTH_USE_READLINE
+    char* line = readline("");
+    if (line) {
+        auto lineSize = std::strlen(line);
+        auto copySize = std::min(lineSize, bufferSize);
+        std::memcpy(buffer, line, copySize);
+        *dTop = static_cast<Cell>(copySize);
+        if (*line)
+            add_history(line);
+        std::free(line);
+    }
+    else {
+        *dTop = 0;
+    }
+#else
+    std::string line;
+    if (std::getline(std::cin, line)) {
+        auto copySize = std::min(line.length(), bufferSize);
+        std::memcpy(buffer, line.data(), copySize);
+        *dTop = static_cast<Cell>(copySize);
+    }
+    else {
+        *dTop = 0;
     }
 #endif
 }
@@ -2285,6 +2326,7 @@ void definePrimitives() {
         {"@",               fetch},
         {"abort",           abort},
         {"abort-message",   abortMessage},
+        {"accept",          accept},
         {"align",           align},
         {"aligned",         aligned},
         {"allot",           allot},
@@ -2614,6 +2656,12 @@ Here are some more words we can define now that we have control structures.
 
     ": space      bl emit ;",
     ": spaces     begin  dup 0> while  space 1-  repeat  drop ;",
+
+/****
+
+I wish I could explain `POSTPONE`, but I can't, so you will just have to google it.
+
+****/
 
     ": postpone   bl word find  1 = if , else  '(lit) , ,  ['] , ,  then ; immediate",
 
