@@ -2282,7 +2282,7 @@ void definePrimitives() {
         // name           code
         // ------------------------------
         {"!",               store},
-        {"#arg",            argCount},
+        {"#args",           argCount},
         {"(zbranch)",       zbranch},
         {"(branch)",        branch},
         {"(does)",          setDoes},
@@ -2815,17 +2815,33 @@ To-Do: `(` should support multi-line comments.
 
 /****
 
-The C++ main() function will look for the Forth word `MAIN` and execute it.  By
-default, this just calls `QUIT`.
+The C++ main() function will look for the Forth word `MAIN` and execute it.
 
-This is where you may want to write your own custom startup code and insert it
-into `MAIN`.
+The `MAIN` word calls `PROCESS-ARGS`, which is not an ANS Forth word.  It looks
+at the number of command-line arguments.  If there are no arguments other than
+the executable path, then it prints the `WELCOME` message.  If there are
+arguments, then it attempts to call `INCLUDED` on each of them.
+
+If you want to write your own custom startup code, `MAIN` is the place to put
+it.
 
 ****/
 
-    "defer main",
+    ": welcome",
+    "    .\" cxxforth " CXXFORTH_VERSION "\" cr",
+    "    .\" Type \'about\' for more information.  Type \'bye\' to exit.\" cr ;",
 
-    "' quit is main",
+    ": process-args",
+    "    #args 1 = if welcome exit then",
+    "    1 begin",
+    "        dup #args <",
+    "    while",
+    "        dup arg included cr",
+    "        1+",
+    "    repeat",
+    "    drop ;",
+
+    ": main   process-args quit ;",
 };
 
 
@@ -2857,7 +2873,9 @@ void initializeDefinitions() {
 
 } // end anonymous namespace
 
-extern "C" void cxxforthReset() {
+const char* cxxforth_version = CXXFORTH_VERSION;
+
+extern "C" void cxxforth_reset() {
 
     std::memset(dStack, 0, sizeof(dStack));
     dTop = dStack - 1;
@@ -2871,12 +2889,12 @@ extern "C" void cxxforthReset() {
     initializeDefinitions();
 }
 
-extern "C" int cxxforthRun(int argc, const char** argv) {
+extern "C" int cxxforth_main(int argc, const char** argv) {
     try {
         commandLineArgCount = static_cast<size_t>(argc);
         commandLineArgVector = argv;
 
-        cxxforthReset();
+        cxxforth_reset();
 
         auto mainXt = findDefinition("MAIN");
         if (!mainXt)
@@ -2894,7 +2912,7 @@ extern "C" int cxxforthRun(int argc, const char** argv) {
 /****
 
 Finally we have our `main()`. If there are no command-line arguments, it prints
-a banner and help message. Then it calls `cxxforthRun()`.
+a banner and help message. Then it calls `cxxforth_main()`.
 
 You can define the macro `CXXFORTH_NO_MAIN` to inhibit generation of `main()`.
 This is useful for incorporating `cxxforth.cpp` into another application or
@@ -2905,12 +2923,7 @@ library.
 #ifndef CXXFORTH_NO_MAIN
 
 int main(int argc, const char** argv) {
-    if (argc == 1) {
-        cout << "cxxforth " << CXXFORTH_VERSION << endl
-             << "Type \"about\" for more information.  Type \"bye\" to exit." << endl;
-    }
-
-    return cxxforthRun(argc, argv);
+    return cxxforth_main(argc, argv);
 }
 
 #endif // CXXFORTH_NO_MAIN
