@@ -771,8 +771,8 @@ values in data space.
     void cstore() {
         REQUIRE_DSTACK_DEPTH(2, "C!");
         auto caddr = CADDR(*dTop); pop();
-        auto x = *dTop; pop();
-        *caddr = static_cast<Char>(x);
+        auto x = static_cast<Char>(*dTop); pop();
+        *caddr = x;
     }
     
     // c@ ( c-addr -- char )
@@ -854,6 +854,12 @@ Next, some primitives for accessing and manipulating the data-space pointer,
         push(static_cast<Cell>(dataSpaceLimit - dataPointer));
     }
     
+
+We could implement memory-block words like `CMOVE`, `CMOVE>` and `FILL` in
+Forth, but speed is often important for these, so we'll make them native
+primitives.
+
+    
     // CMOVE ( c-addr1 c-addr2 u -- )
     void cMove() {
         REQUIRE_DSTACK_DEPTH(3, "CMOVE");
@@ -865,7 +871,7 @@ Next, some primitives for accessing and manipulating the data-space pointer,
     
     // CMOVE> ( c-addr1 c-addr2 u -- )
     void cMoveUp() {
-        REQUIRE_DSTACK_DEPTH(3, "CMOVE");
+        REQUIRE_DSTACK_DEPTH(3, "CMOVE>");
         auto length = SIZE_T(*dTop); pop();
         auto dst = CHARPTR(*dTop); pop();
         auto src = CHARPTR(*dTop); pop();
@@ -873,6 +879,15 @@ Next, some primitives for accessing and manipulating the data-space pointer,
             auto offset = length - i - 1;
             *(src + offset) = *(dst + offset);
         }
+    }
+    
+    // FILL ( c-addr u char -- )
+    void fill() {
+        REQUIRE_DSTACK_DEPTH(3, "FILL");
+        auto ch = static_cast<Char>(*dTop); pop();
+        auto length = SIZE_T(*dTop); pop();
+        auto caddr = CHARPTR(*dTop); pop();
+        std::fill(caddr, caddr + length, ch);
     }
     
 
@@ -2261,6 +2276,7 @@ working system.
             {"evaluate",        evaluate},
             {"execute",         execute},
             {"exit",            exit},
+            {"fill",            fill},
             {"find",            find},
             {"here",            here},
             {"hidden",          hidden},
