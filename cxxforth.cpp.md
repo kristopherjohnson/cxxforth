@@ -724,18 +724,6 @@ are supposed to do.
         }
     }
     
-    // TRUE ( -- flag )
-    void pushTrue() {
-        REQUIRE_DSTACK_AVAILABLE(1, "TRUE");
-        push(True);
-    }
-    
-    // FALSE ( -- flag )
-    void pushFalse() {
-        REQUIRE_DSTACK_AVAILABLE(1, "FALSE");
-        push(False);
-    }
-    
     // >R ( x -- ) ( R:  -- x )
     void toR() {
         REQUIRE_DSTACK_DEPTH(1, ">R");
@@ -967,10 +955,10 @@ We use GNU Readline if configured to do so.  Otherwise we use the C++
             if (*line)
                 add_history(line);
             std::free(line);
-            pushTrue();
+            push(True);
         }
         else {
-            pushFalse();
+            push(False);
         }
     #else
         if (std::getline(std::cin, sourceBuffer)) {
@@ -1122,12 +1110,6 @@ Define arithmetic primitives.
         *dTop = static_cast<Cell>(result.quot);
     }
     
-    // NEGATE ( n1 -- n2 )
-    void negate() {
-        REQUIRE_DSTACK_DEPTH(1, "NEGATE");
-        *dTop = static_cast<Cell>(-static_cast<SCell>(*dTop));
-    }
-    
 
 Define logical and relational primitives.
 
@@ -1151,12 +1133,6 @@ Define logical and relational primitives.
         REQUIRE_DSTACK_DEPTH(2, "XOR");
         auto x2 = *dTop; pop();
         *dTop = *dTop ^ x2;
-    }
-    
-    // INVERT ( x1 -- x2 )
-    void invert() {
-        REQUIRE_DSTACK_DEPTH(1, "INVERT");
-        *dTop = ~*dTop;
     }
     
     // LSHIFT ( x1 u -- x2 )
@@ -2245,16 +2221,13 @@ working system.
             {"evaluate",        evaluate},
             {"execute",         execute},
             {"exit",            exit},
-            {"false",           pushFalse},
             {"find",            find},
             {"here",            here},
             {"hidden",          hidden},
             {"interpret",       interpret},
-            {"invert",          invert},
             {"latest",          latest},
             {"lshift",          lshift},
             {"ms",              ms},
-            {"negate",          negate},
             {"or",              bitwiseOr},
             {"parse",           parse},
             {"pick",            pick},
@@ -2269,7 +2242,6 @@ working system.
             {"source",          source},
             {"state",           state},
             {"time&date",       timeAndDate},
-            {"true",            pushTrue},
             {"type",            type},
             {"u.",              uDot},
             {"unused",          unused},
@@ -2357,6 +2329,13 @@ operations, double-cell stack operations are still useful.
         ": 2r@     r> r> 2dup >r >r swap ;",
     
 
+`FALSE` and `TRUE` are useful constants.
+
+    
+        ": false   0 ;",
+        ": true    -1 ;",
+    
+
 Forth has a few words for incrementing/decrementing the top-of-stack value.
 
     
@@ -2372,6 +2351,13 @@ Forth has a few words for incrementing/decrementing the top-of-stack value.
 
     
         ": +!   dup >r @ + r> ! ;",
+    
+
+`NEGATE` and `INVERT` can be implemented in terms of other primitives.
+
+    
+        ": negate   0 swap - ;",
+        ": invert   true xor ;",
     
 
 `, ( x -- )` places a cell value in dataspace.
