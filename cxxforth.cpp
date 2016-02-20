@@ -1757,7 +1757,7 @@ void see() {
     else {
         cout << ": " << defn->name << " <primitive " << SETBASE() << CELL(defn->code) << "> ;";
     }
-    if (defn->isImmediate()) cout << " IMMEDIATE";
+    if (defn->isImmediate()) cout << " immediate";
 }
 
 /****
@@ -2267,8 +2267,8 @@ void definePrimitives() {
         // name             code
         // ------------------------------
         {";",               semicolon},
-        {"DOES>",           does},
-        {"IMMEDIATE",       immediate},
+        {"does>",           does},
+        {"immediate",       immediate},
     };
     for (auto& w: immediateCodeWords) {
         definePrimitive(w.name, w.code);
@@ -2282,7 +2282,7 @@ void definePrimitives() {
         // name           code
         // ------------------------------
         {"!",               store},
-        {"#ARG",            argCount},
+        {"#arg",            argCount},
         {"(zbranch)",       zbranch},
         {"(branch)",        branch},
         {"(does)",          setDoes},
@@ -2292,96 +2292,96 @@ void definePrimitives() {
         {"+",               plus},
         {"-",               minus},
         {".",               dot},
-        {".RS",             dotRS},
-        {".S",              dotS},
+        {".rs",             dotRS},
+        {".s",              dotS},
         {"/",               slash},
-        {"/MOD",            slashMod},
+        {"/mod",            slashMod},
         {":",               colon},
-        {":NONAME",         noname},
+        {":noname",         noname},
         {"<",               lessThan},
         {"=",               equals},
         {">",               greaterThan},
-        {">BODY",           toBody},
-        {">IN",             toIn},
-        {">NUM",            parseSignedNumber},
-        {">R",              toR},
-        {">UNUM",           parseUnsignedNumber},
+        {">body",           toBody},
+        {">in",             toIn},
+        {">num",            parseSignedNumber},
+        {">r",              toR},
+        {">unum",           parseUnsignedNumber},
         {"@",               fetch},
-        {"ABORT",           abort},
-        {"ABORT-MESSAGE",   abortMessage},
-        {"ALIGN",           align},
-        {"ALIGNED",         aligned},
-        {"ALLOT",           allot},
-        {"AND",             bitwiseAnd},
-        {"ARG",             argAtIndex},
-        {"BASE",            base},
-        {"BL",              bl},
-        {"BYE",             bye},
-        {"C!",              cstore},
-        {"C@",              cfetch},
-        {"CELLS",           cells},
-        {"CMOVE",           cMove},
-        {"CMOVE>",          cMoveUp},
-        {"COUNT",           count},
-        {"CR",              cr},
-        {"CREATE",          create},
-        {"DEPTH",           depth},
-        {"DROP",            drop},
-        {"EMIT",            emit},
-        {"EVALUATE",        evaluate},
-        {"EXECUTE",         execute},
-        {"EXIT",            exit},
-        {"FALSE",           pushFalse},
-        {"FIND",            find},
-        {"HERE",            here},
-        {"HIDDEN",          hidden},
-        {"INTERPRET",       interpret},
-        {"INVERT",          invert},
-        {"LATEST",          latest},
-        {"LSHIFT",          lshift},
-        {"MS",              ms},
-        {"NEGATE",          negate},
-        {"OR",              bitwiseOr},
-        {"PARSE",           parse},
-        {"PICK",            pick},
-        {"PROMPT",          prompt},
-        {"QUIT",            quit},
-        {"R>",              rFrom},
-        {"R@",              rFetch},
-        {"REFILL",          refill},
-        {"ROLL",            roll},
-        {"RSHIFT",          rshift},
-        {"SEE",             see},
-        {"SOURCE",          source},
-        {"STATE",           state},
-        {"TIME&DATE",       timeAndDate},
-        {"TRUE",            pushTrue},
-        {"TYPE",            type},
-        {"U.",              uDot},
-        {"UNUSED",          unused},
-        {"UTCTIME&DATE",    utcTimeAndDate},
-        {"WORD",            word},
-        {"WORDS",           words},
-        {"XT>NAME",         xtToName},
-        {"XOR",             bitwiseXor},
+        {"abort",           abort},
+        {"abort-message",   abortMessage},
+        {"align",           align},
+        {"aligned",         aligned},
+        {"allot",           allot},
+        {"and",             bitwiseAnd},
+        {"arg",             argAtIndex},
+        {"base",            base},
+        {"bl",              bl},
+        {"bye",             bye},
+        {"c!",              cstore},
+        {"c@",              cfetch},
+        {"cells",           cells},
+        {"cmove",           cMove},
+        {"cmove>",          cMoveUp},
+        {"count",           count},
+        {"cr",              cr},
+        {"create",          create},
+        {"depth",           depth},
+        {"drop",            drop},
+        {"emit",            emit},
+        {"evaluate",        evaluate},
+        {"execute",         execute},
+        {"exit",            exit},
+        {"false",           pushFalse},
+        {"find",            find},
+        {"here",            here},
+        {"hidden",          hidden},
+        {"interpret",       interpret},
+        {"invert",          invert},
+        {"latest",          latest},
+        {"lshift",          lshift},
+        {"ms",              ms},
+        {"negate",          negate},
+        {"or",              bitwiseOr},
+        {"parse",           parse},
+        {"pick",            pick},
+        {"prompt",          prompt},
+        {"quit",            quit},
+        {"r>",              rFrom},
+        {"r@",              rFetch},
+        {"refill",          refill},
+        {"roll",            roll},
+        {"rshift",          rshift},
+        {"see",             see},
+        {"source",          source},
+        {"state",           state},
+        {"time&date",       timeAndDate},
+        {"true",            pushTrue},
+        {"type",            type},
+        {"u.",              uDot},
+        {"unused",          unused},
+        {"utctime&date",    utcTimeAndDate},
+        {"word",            word},
+        {"words",           words},
+        {"xt>name",         xtToName},
+        {"xor",             bitwiseXor},
 #ifndef CXXFORTH_DISABLE_FILE_ACCESS
-        {"BIN",             bin},
-        {"CLOSE-FILE",      closeFile},
-        {"CREATE-FILE",     createFile},
-        {"DELETE-FILE",     deleteFile},
-        {"FLUSH-FILE",      flushFile},
-        {"INCLUDE-FILE",    includeFile},
-        {"OPEN-FILE",       openFile},
-        {"R/O",             readOnly},
-        {"R/W",             readWrite},
-        {"READ-CHAR",       readChar},
-        {"READ-FILE",       readFile},
-        {"READ-LINE",       readLine},
-        {"RENAME-FILE",     renameFile},
-        {"W/O",             writeOnly},
-        {"WRITE-CHAR",      writeChar},
-        {"WRITE-FILE",      writeFile},
-        {"WRITE-LINE",      writeLine},
+        {"bin",             bin},
+        {"close-file",      closeFile},
+        {"create-file",     createFile},
+        {"delete-file",     deleteFile},
+        {"flush-file",      flushFile},
+        {"include-file",    includeFile},
+        {"open-file",       openFile},
+        {"r/o",             readOnly},
+        {"r/w",             readWrite},
+        {"read-char",       readChar},
+        {"read-file",       readFile},
+        {"read-line",       readLine},
+        {"rename-file",     renameFile},
+        {"w/o",             writeOnly},
+        {"write-char",      writeChar},
+        {"write-file",      writeFile},
+        {"write-line",      writeLine},
 #endif
     };
     for (auto& w: codeWords) {
@@ -2394,7 +2394,7 @@ void definePrimitives() {
     setDoesXt = findDefinition("(does)");
     if (setDoesXt == nullptr) throw runtime_error("Can't find (does) in kernel dictionary");
 
-    exitXt = findDefinition("EXIT");
+    exitXt = findDefinition("exit");
     if (exitXt == nullptr) throw runtime_error("Can't find EXIT in kernel dictionary");
 
     endOfDefinitionXt = findDefinition("(;)");
@@ -2432,19 +2432,19 @@ operations, double-cell stack operations are still useful.
 
 ****/
 
-    ": DUP     0 PICK ;",
-    ": OVER    1 PICK ;",
-    ": SWAP    1 ROLL ;",
-    ": ROT     2 ROLL ;",
-    ": NIP     SWAP DROP ;",
-    ": TUCK    SWAP OVER ;",
-    ": 2DROP   DROP DROP ;",
-    ": 2DUP    OVER OVER ;",
-    ": 2OVER   3 PICK 3 PICK ;",
-    ": 2SWAP   3 ROLL 3 ROLL ;",
-    ": 2>R     SWAP >R >R ;",
-    ": 2R>     R> R> SWAP ;",
-    ": 2R@     R> R> 2DUP >R >R SWAP ;",
+    ": dup     0 pick ;",
+    ": over    1 pick ;",
+    ": swap    1 roll ;",
+    ": rot     2 roll ;",
+    ": nip     swap drop ;",
+    ": tuck    swap over ;",
+    ": 2drop   drop drop ;",
+    ": 2dup    over over ;",
+    ": 2over   3 pick 3 pick ;",
+    ": 2swap   3 roll 3 roll ;",
+    ": 2>r     swap >r >r ;",
+    ": 2r>     r> r> swap ;",
+    ": 2r@     r> r> 2dup >r >r swap ;",
 
 /****
 
@@ -2455,9 +2455,9 @@ Forth has a few words for incrementing/decrementing the top-of-stack value.
     ": 1+   1 + ;",
     ": 1-   1 - ;",
 
-    ": CELL+   1 CELLS + ;",
-    ": CHAR+   1+ ;",
-    ": CHARS   ;",
+    ": cell+   1 cells + ;",
+    ": char+   1+ ;",
+    ": chars   ;",
 
 /****
 
@@ -2465,7 +2465,7 @@ Forth has a few words for incrementing/decrementing the top-of-stack value.
 
 ****/
 
-    ": +!   DUP >R @ + R> ! ;",
+    ": +!   dup >r @ + r> ! ;",
 
 /****
 
@@ -2475,8 +2475,8 @@ Forth has a few words for incrementing/decrementing the top-of-stack value.
 
 ****/
 
-    ": ,    HERE  1 CELLS ALLOT  ! ;",
-    ": C,   HERE  1 CHARS ALLOT  C! ;",
+    ": ,    here  1 cells allot  ! ;",
+    ": c,   here  1 chars allot  c! ;",
 
 /****
 
@@ -2486,11 +2486,11 @@ mapping to CPU opcodes, but in this system, they are just abbreviations.
 
 ****/
 
-    ": <>    = INVERT ;",
+    ": <>    = invert ;",
     ": 0<    0 < ;",
     ": 0>    0 > ;",
     ": 0=    0 = ;",
-    ": 0<>   0= INVERT ;",
+    ": 0<>   0= invert ;",
 
 /****
 
@@ -2499,8 +2499,8 @@ right.
 
 ****/
 
-    ": 2*   1 LSHIFT ;",
-    ": 2/   1 RSHIFT ;",
+    ": 2*   1 lshift ;",
+    ": 2/   1 rshift ;",
 
 /****
 
@@ -2508,7 +2508,7 @@ A Forth variable is just a named location in dataspace.  We'll use `CREATE` and 
 
 ****/
 
-    ": VARIABLE   CREATE 0 , ;",
+    ": variable   create 0 , ;",
     ": ?          @ . ;",
 
 /****
@@ -2519,8 +2519,8 @@ can implement this using `CREATE...DOES>`.
 
 ****/
 
-    ": CONSTANT    CREATE ,    DOES>  @ ;",
-    ": 2CONSTANT   CREATE , ,  DOES>  DUP CELL+ @ SWAP @ ;",
+    ": constant    create ,    does>  @ ;",
+    ": 2constant   create , ,  does>  dup cell+ @ swap @ ;",
 
 /****
 
@@ -2529,7 +2529,7 @@ of a cell without using `1 CELLS`.
 
 ****/
 
-    "1 CELLS   CONSTANT /CELL",
+    "1 cells   constant /cell",
 
 /****
 
@@ -2537,8 +2537,8 @@ of a cell without using `1 CELLS`.
 
 ****/
 
-    ": DECIMAL   10 BASE ! ;",
-    ": HEX       16 BASE ! ;",
+    ": decimal   10 base ! ;",
+    ": hex       16 base ! ;",
 
 /****
 
@@ -2548,8 +2548,8 @@ of a cell without using `1 CELLS`.
 
 ****/
 
-    ": ]   TRUE STATE ! ;",
-    ": [   FALSE STATE ! ; IMMEDIATE",
+    ": ]   true state ! ;",
+    ": [   false state ! ; immediate",
 
 /****
 
@@ -2557,7 +2557,7 @@ of a cell without using `1 CELLS`.
 
 ****/
 
-    ": '   BL WORD FIND DROP ;",
+    ": '   bl word find drop ;",
 
 /****
 
@@ -2568,8 +2568,8 @@ Because we'll be using `(lit)` in other word definitions, we'll create a constan
 
 ****/
 
-    "' (lit)  constant '(lit)",
-    ": LITERAL  '(lit) , , ; IMMEDIATE",
+    "' (lit)     constant '(lit)",
+    ": literal   '(lit) , , ; immediate",
 
 /****
 
@@ -2577,7 +2577,7 @@ Because we'll be using `(lit)` in other word definitions, we'll create a constan
 
 ****/
 
-    ": [']   ' '(lit) , , ; IMMEDIATE",
+    ": [']   ' '(lit) , , ; immediate",
 
 /****
 
@@ -2585,10 +2585,10 @@ Because we'll be using `(lit)` in other word definitions, we'll create a constan
 
 ****/
 
-    ": RECURSE     LATEST , ; IMMEDIATE",
+    ": recurse     latest , ; immediate",
 
-    ": CHAR     BL WORD CHAR+ C@ ;",
-    ": [CHAR]   CHAR '(lit) , , ; IMMEDIATE",
+    ": char     bl word char+ c@ ;",
+    ": [char]   char '(lit) , , ; immediate",
 
 /****
 
@@ -2602,15 +2602,15 @@ See the [Control Structures[jonesforthControlStructures] section of
 
 ****/
 
-    ": IF       ['] (zbranch) ,  HERE  0 , ; IMMEDIATE",
-    ": THEN     DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
-    ": ELSE     ['] (branch) ,  HERE 0 ,  SWAP DUP HERE SWAP -  SWAP ! ; IMMEDIATE",
+    ": if       ['] (zbranch) ,  here  0 , ; immediate",
+    ": then     dup  here swap -  swap ! ; immediate",
+    ": else     ['] (branch) ,  here 0 ,  swap dup here swap -  swap ! ; immediate",
 
-    ": BEGIN    HERE ; IMMEDIATE",
-    ": AGAIN    ['] (branch) ,  HERE - , ; IMMEDIATE",
-    ": UNTIL    ['] (zbranch) ,  HERE - , ; IMMEDIATE",
-    ": WHILE    ['] (zbranch) ,  HERE 0 , ; IMMEDIATE",
-    ": REPEAT   ['] (branch) ,  SWAP HERE - ,  DUP  HERE SWAP -  SWAP ! ; IMMEDIATE",
+    ": begin    here ; immediate",
+    ": again    ['] (branch) ,  here - , ; immediate",
+    ": until    ['] (zbranch) ,  here - , ; immediate",
+    ": while    ['] (zbranch) ,  here 0 , ; immediate",
+    ": repeat   ['] (branch) ,  swap here - ,  dup  here swap -  swap ! ; immediate",
 
 /****
 
@@ -2618,14 +2618,14 @@ Here are some more words we can define now that we have control structures.
 
 ****/
     
-    ": ?DUP       DUP 0<> IF DUP THEN ;",
+    ": ?dup       dup 0<> if dup then ;",
 
-    ": ABS        DUP 0 < IF NEGATE THEN ;",
+    ": abs        dup 0 < if negate then ;",
 
-    ": SPACE      BL EMIT ;",
-    ": SPACES     BEGIN  DUP 0> WHILE  SPACE 1-  REPEAT  DROP ;",
+    ": space      bl emit ;",
+    ": spaces     begin  dup 0> while  space 1-  repeat  drop ;",
 
-    ": POSTPONE   BL WORD FIND  1 = IF , ELSE  '(lit) , ,  ['] , ,  THEN ; IMMEDIATE",
+    ": postpone   bl word find  1 = if , else  '(lit) , ,  ['] , ,  then ; immediate",
 
 /****
 
@@ -2637,14 +2637,14 @@ could use `TO` to change the value of a constant, but that's against the rules.
 
 ****/
 
-    ": VALUE    CONSTANT ;",
+    ": value    constant ;",
 
-    ": VALUE!   >BODY ! ;",
-    ": TO       STATE @ IF",
-    "               POSTPONE ['] POSTPONE VALUE!",
-    "           ELSE",
-    "               ' VALUE!",
-    "           THEN ; IMMEDIATE",
+    ": value!   >body ! ;",
+    ": to       state @ if",
+    "               postpone ['] postpone value!",
+    "           else",
+    "               ' value!",
+    "           then ; immediate",
 
 /****
 
@@ -2660,22 +2660,22 @@ definitions here are based upon those in that proposal.
 
 ****/
 
-    ": DEFER       CREATE ['] ABORT ,",
-    "              DOES> @ EXECUTE ;",
+    ": defer       create ['] abort ,",
+    "              does> @ execute ;",
 
-    ": DEFER@      >BODY @ ;",
-    ": DEFER!      >BODY ! ;",
-    ": IS          STATE @ IF",
-    "                  POSTPONE ['] POSTPONE DEFER!",
-    "              ELSE",
-    "                  ' DEFER!",
-    "              THEN ; IMMEDIATE",
+    ": defer@      >body @ ;",
+    ": defer!      >body ! ;",
+    ": is          state @ if",
+    "                  postpone ['] postpone defer!",
+    "              else",
+    "                  ' defer!",
+    "              then ; immediate",
 
-    ": ACTION-OF   STATE @ IF",
-    "                  POSTPONE ['] POSTPONE DEFER@",
-    "              ELSE",
-    "                  ' DEFER@",
-    "              THEN ; IMMEDIATE",
+    ": action-of   state @ if",
+    "                  postpone ['] postpone defer@",
+    "              else",
+    "                  ' defer@",
+    "              then ; immediate",
 
 /****
 
@@ -2705,19 +2705,19 @@ This word prints the given string.  We can implement it in terms of `S"` and
 
 ****/
 
-    ": S\"   [CHAR] \" PARSE",
-    "        STATE @ IF",
-    "            >R",
-    "            ['] (branch) , HERE >R 0 ,",  // compile a branch with dummy offset
-    "            R> R> 2DUP >R >R",
-    "            SWAP CELL+ SWAP",             // copy into the first byte after the offset
-    "            DUP ALLOT  CMOVE ALIGN",      // allocate dataspace and copy string into it
-    "            R> DUP POSTPONE THEN",        // resolve the branch
-    "            CELL+ POSTPONE LITERAL",      // compile literal for address
-    "            R> POSTPONE LITERAL",         // compile literal for length
-    "        THEN ; IMMEDIATE",
+    ": s\"   [char] \" parse",
+    "        state @ if",
+    "            >r",
+    "            ['] (branch) , here >r 0 ,",  // compile a branch with dummy offset
+    "            r> r> 2dup >r >r",
+    "            swap cell+ swap",             // copy into the first byte after the offset
+    "            dup allot  cmove align",      // allocate dataspace and copy string into it
+    "            r> dup postpone then",        // resolve the branch
+    "            cell+ postpone literal",      // compile literal for address
+    "            r> postpone literal",         // compile literal for length
+    "        then ; immediate",
 
-    ": .\"   POSTPONE S\" POSTPONE TYPE ; IMMEDIATE",
+    ": .\"   postpone s\" postpone type ; immediate",
 
 /****
 
@@ -2727,8 +2727,8 @@ continue the interpreter loop.
 
 ****/
 
-    ": (ABORT\")   ROT IF ABORT-MESSAGE THEN 2DROP ;",
-    ": ABORT\"     POSTPONE S\" POSTPONE (ABORT\") ; IMMEDIATE",
+    ": (abort\")   rot if abort-message then 2drop ;",
+    ": abort\"     postpone s\" postpone (abort\") ; immediate",
 
 /****
 
@@ -2743,11 +2743,10 @@ the following:
 
 #ifndef CXXFORTH_DISABLE_FILE_ACCESS
 
-    ": INCLUDED",
-    "    R/O OPEN-FILE  ABORT\" INCLUDED: unable to open file\"",
-    "    DUP INCLUDE-FILE",
-    "    CLOSE-FILE  ABORT\" INCLUDED: unable to close file\"",
-    ";",
+    ": included",
+    "    r/o open-file  abort\" included: unable to open file\"",
+    "    dup include-file",
+    "    close-file  abort\" included: unable to close file\" ;",
 
 #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
 
@@ -2777,9 +2776,9 @@ To-Do: `(` should support multi-line comments.
 
 ****/
 
-    ": \\   SOURCE NIP >IN ! ; IMMEDIATE",
-    ": #!   POSTPONE \\ ; IMMEDIATE",
-    ": (    [CHAR] ) PARSE 2DROP ; IMMEDIATE",
+    ": \\   source nip >in ! ; immediate",
+    ": #!   postpone \\ ; immediate",
+    ": (    [char] ) parse 2drop ; immediate",
 
 /****
 
@@ -2787,33 +2786,32 @@ To-Do: `(` should support multi-line comments.
 
 ****/
 
-    ": ABOUT",
-    "      CR",
-    "      .\" cxxforth " CXXFORTH_VERSION "\" CR",
-    "      .\" by Kristopher Johnson\" CR",
-    "      CR",
-    "      .\" This is free and unencumbered software released into the public domain.\" CR",
-    "      CR",  
-    "      .\" Anyone is free to copy, modify, publish, use, compile, sell, or distribute this\" CR",
-    "      .\" software, either in source code form or as a compiled binary, for any purpose,\" CR",
-    "      .\" commercial or non-commercial, and by any means.\" CR",
-    "      CR",
-    "      .\" In jurisdictions that recognize copyright laws, the author or authors of this\" CR",
-    "      .\" software dedicate any and all copyright interest in the software to the public\" CR",
-    "      .\" domain. We make this dedication for the benefit of the public at large and to\" CR",
-    "      .\" the detriment of our heirs and successors. We intend this dedication to be an\" CR",
-    "      .\" overt act of relinquishment in perpetuity of all present and future rights to\" CR",
-    "      .\" this software under copyright law.\" CR",
-    "      CR",
-    "      .\" THE SOFTWARE IS PROVIDED 'AS IS' WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\" CR",
-    "      .\" IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\" CR",
-    "      .\" FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\" CR",
-    "      .\" AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN\" CR",
-    "      .\" ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\" CR",
-    "      .\" WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\" CR",
-    "      CR",
-    "      .\" For more, visit <https://github.com/kristopherjohnson/cxxforth>.\" CR",
-    ";",
+    ": about",
+    "      cr",
+    "      .\" cxxforth " CXXFORTH_VERSION "\" cr",
+    "      .\" by Kristopher Johnson\" cr",
+    "      cr",
+    "      .\" This is free and unencumbered software released into the public domain.\" cr",
+    "      cr",  
+    "      .\" Anyone is free to copy, modify, publish, use, compile, sell, or distribute this\" cr",
+    "      .\" software, either in source code form or as a compiled binary, for any purpose,\" cr",
+    "      .\" commercial or non-commercial, and by any means.\" cr",
+    "      cr",
+    "      .\" In jurisdictions that recognize copyright laws, the author or authors of this\" cr",
+    "      .\" software dedicate any and all copyright interest in the software to the public\" cr",
+    "      .\" domain. We make this dedication for the benefit of the public at large and to\" cr",
+    "      .\" the detriment of our heirs and successors. We intend this dedication to be an\" cr",
+    "      .\" overt act of relinquishment in perpetuity of all present and future rights to\" cr",
+    "      .\" this software under copyright law.\" cr",
+    "      cr",
+    "      .\" THE SOFTWARE IS PROVIDED 'AS IS' WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\" cr",
+    "      .\" IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\" cr",
+    "      .\" FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\" cr",
+    "      .\" AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN\" cr",
+    "      .\" ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\" cr",
+    "      .\" WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\" cr",
+    "      cr",
+    "      .\" For more, visit <https://github.com/kristopherjohnson/cxxforth>.\" cr ;",
 
 /****
 
@@ -2825,9 +2823,9 @@ into `MAIN`.
 
 ****/
 
-    "DEFER MAIN",
+    "defer main",
 
-    "' QUIT IS MAIN",
+    "' quit is main",
 };
 
 
