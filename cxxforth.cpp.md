@@ -1231,6 +1231,20 @@ Define logical and relational primitives.
         *dTop = static_cast<SCell>(*dTop) > n2 ? True : False;
     }
     
+    // U< ( u1 u2 -- flag )
+    void uLessThan() {
+        REQUIRE_DSTACK_DEPTH(2, "U<");
+        auto u2 = static_cast<Cell>(*dTop); pop();
+        *dTop = static_cast<Cell>(*dTop) < u2 ? True : False;
+    }
+    
+    // U> ( u1 u2 -- flag )
+    void uGreaterThan() {
+        REQUIRE_DSTACK_DEPTH(2, "U>");
+        auto u2 = static_cast<Cell>(*dTop); pop();
+        *dTop = static_cast<Cell>(*dTop) > u2 ? True : False;
+    }
+    
 
 Define system and environmental primitives
 
@@ -2307,6 +2321,8 @@ working system.
             {"state",           state},
             {"time&date",       timeAndDate},
             {"type",            type},
+            {"u<",              uLessThan},
+            {"u>",              uGreaterThan},
             {"u.",              uDot},
             {"unused",          unused},
             {"utctime&date",    utcTimeAndDate},
@@ -2549,6 +2565,9 @@ Here are some more words we can define now that we have control structures.
         ": ?dup       dup 0<> if dup then ;",
     
         ": abs        dup 0 < if negate then ;",
+    
+        ": max        2dup < if nip else drop then ;",
+        ": min        2dup < if drop else nip then ;",
     
         ": space      bl emit ;",
         ": spaces     begin  dup 0> while  space 1-  repeat  drop ;",
