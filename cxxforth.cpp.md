@@ -1664,7 +1664,7 @@ word is not compiling as expected.
         bl(); word(); find();
     
         auto found = *dTop; pop();
-        if (!found) throw AbortException("SEE: no such word");
+        if (!found) throw AbortException("SEE: undefined word");
     
         auto defn = XT(*dTop); pop();
         if (defn->code == doColon) {
@@ -2506,6 +2506,52 @@ Here are some more words we can define now that we have control structures.
         ": POSTPONE   BL WORD FIND  1 = IF , ELSE  '(lit) , ,  ['] , ,  THEN ; IMMEDIATE",
     
 
+A Forth `VALUE` is just like a constant in that it puts a value on the stack
+when invoked.  However, the stored value can be modified with `TO`.
+
+`VALUE` is, in fact, exactly the same as `CONSTANT` in this Forth.  And so you
+could use `TO` to change the value of a constant, but that's against the rules.
+
+    
+        ": VALUE    CONSTANT ;",
+    
+        ": VALUE!   >BODY ! ;",
+        ": TO       STATE @ IF",
+        "               POSTPONE ['] POSTPONE VALUE!",
+        "           ELSE",
+        "               ' VALUE!",
+        "           THEN ; IMMEDIATE",
+    
+
+`DEFER` and `IS` are similar to `VALUE` and `TO`, except that the value is an
+execution token, and when the created word is used it invokes that xt.  `IS`
+can be used to change the execution token.  In C++ terms, you can think of this
+as a pointer to a function pointer.
+
+`DEFER` and `IS` are not ANS Forth standard words, but are in common use, and
+are described formally in a proposal at
+<https://www.complang.tuwien.ac.at/forth/ansforth-precvs/deferred.html>.  The
+definitions here are based upon those in that proposal.
+
+    
+        ": DEFER       CREATE ['] ABORT ,",
+        "              DOES> @ EXECUTE ;",
+    
+        ": DEFER@      >BODY @ ;",
+        ": DEFER!      >BODY ! ;",
+        ": IS          STATE @ IF",
+        "                  POSTPONE ['] POSTPONE DEFER!",
+        "              ELSE",
+        "                  ' DEFER!",
+        "              THEN ; IMMEDIATE",
+    
+        ": ACTION-OF   STATE @ IF",
+        "                  POSTPONE ['] POSTPONE DEFER@",
+        "              ELSE",
+        "                  ' DEFER@",
+        "              THEN ; IMMEDIATE",
+    
+
 Strings
 -------
 
@@ -2631,7 +2677,19 @@ To-Do: `(` should support multi-line comments.
         "      CR",
         "      .\" For more, visit <https://github.com/kristopherjohnson/cxxforth>.\" CR",
         ";",
+    
+
+The C++ main() function will look for the Forth word `MAIN` and execute it.  By
+default, this just calls `QUIT`.
+
+This is where you may want to write your own custom startup code and insert it
+into `MAIN`.
+
+    
+        "DEFER MAIN",
+        "' QUIT IS MAIN",
     };
+    
     
 
 That is the end of our built-in Forth definitions.
@@ -2645,7 +2703,6 @@ With the `forthDefinitions` array filled, all we need to do is call
         for (size_t i = 0; i < lineCount; ++i) {
             auto line = forthDefinitions[i];
             auto length = std::strlen(line);
-            // cerr << "Built-in: " << line << endl;
             push(CELL(line));
             push(CELL(length));
             evaluate();
@@ -2681,10 +2738,10 @@ With the `forthDefinitions` array filled, all we need to do is call
     
             cxxforthReset();
     
-            auto quit = findDefinition("QUIT");
-            if (!quit)
-                throw runtime_error("QUIT not defined");
-            quit->execute();
+            auto mainXt = findDefinition("MAIN");
+            if (!mainXt)
+                throw runtime_error("MAIN not defined");
+            mainXt->execute();
     
             return 0;
         }
