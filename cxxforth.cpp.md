@@ -2743,6 +2743,13 @@ during the compilation of words.
         ": .(    [char] ) parse type ; immediate",
     
 
+`/STRING ( c-addr1 u1 n1 -- c-addr2 u2 )` adjusts a character string by adding
+to the address and subtracting from the length.
+
+    
+        ": /string   dup >r - swap r> + swap ;",
+    
+
 `ABORT"` checks whether a result is non-zero, and if so, it throws an exception
 that will be caught by `QUIT`, which will print the given message and then
 continue the interpreter loop.
@@ -2759,13 +2766,22 @@ the following:
     s" tests/hello.fs" INCLUDED
     hello
 
+`INCLUDE` is a simpler variation, used like this:
+
+    INCLUDE tests/hello.fs
+    hello
+
+`INCLUDE` is not part of the AND standard, but is in Forth 2012.
+
     
     #ifndef CXXFORTH_DISABLE_FILE_ACCESS
     
         ": included",
-        "    r/o open-file  abort\" included: unable to open file\"",
+        "    r/o open-file abort\" included: unable to open file\"",
         "    dup include-file",
-        "    close-file  abort\" included: unable to close file\" ;",
+        "    close-file abort\" included: unable to close file\" ;",
+    
+        ": include   bl word count included ;",
     
     #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
     
