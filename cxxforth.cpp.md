@@ -937,6 +937,14 @@ We keep things simple and portable by using C++ iostream objects.
         pop();
     }
     
+    // .R ( n1 n2 -- )
+    void dotR() {
+        REQUIRE_DSTACK_DEPTH(2, ".R");
+        auto width = static_cast<int>(*dTop); pop();
+        auto n = static_cast<SCell>(*dTop); pop();
+        cout << SETBASE() << std::setw(width) << n;
+    }
+    
     // BASE ( -- a-addr )
     void base() {
         REQUIRE_DSTACK_AVAILABLE(1, "BASE");
@@ -2257,6 +2265,7 @@ working system.
             {"+",               plus},
             {"-",               minus},
             {".",               dot},
+            {".r",              dotR},
             {".rs",             dotRS},
             {".s",              dotS},
             {"/",               slash},
