@@ -2673,6 +2673,8 @@ This word prints the given string.  We can implement it in terms of `S"` and
     
         ": .\"   postpone s\" postpone type ; immediate",
     
+        ": .(    [char] ) parse type ; immediate",
+    
 
 `ABORT"` checks whether a result is non-zero, and if so, it throws an exception
 that will be caught by `QUIT`, which will print the given message and then
