@@ -63,11 +63,15 @@ not support C++14 yet, you may need to make some modifications to the code to
 get it to build.
 
 The Forth words provided by cxxforth are based on those in the [ANS Forth draft
-standard][dpans].  I don't claim conformance to the standard, but you can use
-the draft standard as a crude form of documentation for the Forth words that
-are implemented here.  cxxforth implements many of the words from the
-standard's Core and Core Extension word sets, and a smattering of words from
-other standard word sets.
+standard][dpans] and [Forth 2012 standard][forth2012].  I don't claim
+conformance to any standard, but you can use the ANS draft standard as a crude
+form of documentation for the Forth words that are implemented here.  cxxforth
+implements many of the words from the standards' Core and Core Extension word
+sets, and a smattering of words from other standard word sets.
+
+In addition to words from the standards, cxxforth provides a few non-standard
+words.  Each of these is marked with "Not a standard word" in accompanying
+comments.
 
 While this Forth can be seen as a toy implementation, I do want it to be usable
 for real-world applications.  Forth was originally designed to be something
@@ -85,6 +89,8 @@ implementation to get the basic gist of how Forth is usually implemented.
 [markdown]: https://daringfireball.net/projects/markdown/ "Markdown"
 
 [dpans]: http://forth.sourceforge.net/std/dpans/dpansf.htm "Alphabetic list of words"
+
+[forth2012]: http://forth-standard.org/standard/alpha "Forth 2012"
 
 ----
 
@@ -580,9 +586,9 @@ using a C++ exception to return control to the top-level interpreter.
 The C++ functions `abort()` and `abortMessage()` defined here are the first
 primitive functions that will be exposed as Forth words.  For each such word, I
 will spell out the Forth name of the primitive in all-caps, and provide a Forth
-comment showing the stack effects.  For words described in the ANS Forth draft
-standard, I will generally not provide any more information, but for words that
-are not ANS Forth words, I'll provide a brief description.
+comment showing the stack effects.  For words described in the standards, I
+will generally not provide any more information, but for words that are not
+standard words, I'll provide a brief description.
 
 ****/
 
@@ -599,10 +605,10 @@ void abort() {
 
 // ABORT-MESSAGE ( i*x c-addr u -- ) ( R: j*x -- )
 // 
-// Not an ANS Forth word.
+// Not a standard word.
 //
-// Same semantics as ANS Forth's ABORT", but takes a string address and length
-// instead of parsing message.
+// Same semantics as the standard ABORT", but takes a string address and length
+// instead of parsing the message string.
 void abortMessage() {
     auto count = SIZE_T(*dTop); pop();
     auto caddr = CHARPTR(*dTop); pop();
@@ -733,8 +739,7 @@ values via C++ call/return mechanisms.
 
 Note that for C++ functions that implement primitive Forth words, we will
 include the Forth names and stack effects in comments. You can look up the
-Forth names in the [ANS Forth draft standard][dpans] to learn what these words
-are supposed to do.
+Forth names in the standards to learn what these words are supposed to do.
 
 ****/
 
@@ -1111,9 +1116,9 @@ word(); count();` This corresponds to the Forth phrase `BL WORD COUNT`, which
 is how many Forth definitions read a space-delimited word from the input and
 get its address and length.
 
-The ANS Forth draft standard specifies that the `WORD` buffer must contain a
-space character after the character data, but we aren't going to worry about
-this obsolescent requirement.
+The standards specify that the `WORD` buffer must contain a space character
+after the character data, but we aren't going to worry about this obsolescent
+requirement.
 
 ****/
 
@@ -1329,7 +1334,7 @@ Define system and environmental primitives
 
 // #ARG ( -- n )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Provide count of command-line arguments.
 void argCount() {
@@ -1339,7 +1344,7 @@ void argCount() {
 
 // ARG ( n -- c-addr u )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Provide the Nth command-line argument.
 void argAtIndex() {
@@ -1379,7 +1384,7 @@ void timeAndDate () {
 
 // UTCTIME&DATE ( -- +n1 +n2 +n3 +n4 +n5 +n6 )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Like TIME&DATE, but returns UTC rather than local time.
 void utcTimeAndDate () {
@@ -1405,7 +1410,7 @@ void dotS() {
 
 // .RS ( -- )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Like .S, but prints the contents of the return stack instead of the data
 // stack.
@@ -1479,7 +1484,7 @@ Definition& lastDefinition() {
 
 // LATEST ( -- xt )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Puts the execution token of the most recently CREATEd word on the stack.
 void latest() {
@@ -1557,7 +1562,7 @@ void does() {
 
 // (;) ( -- )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // This word is compiled by ; after the EXIT.  It is never executed, but serves
 // as a marker for use in debugging.
@@ -1575,13 +1580,13 @@ void semicolon() {
 
 // IMMEDIATE ( -- )
 //
-// Note: Unlike ANS Forth, our IMMEDIATE toggles the immediacy bit of the most
-// recent definition, rather than always setting it true.
+// Unlike the standard specification, our IMMEDIATE toggles the immediacy bit
+// of the most recent definition, rather than always setting it true.
 void immediate() { lastDefinition().toggleImmediate(); }
 
 // HIDDEN ( -- )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Toggles the hidden bit of the ost recent definition.
 void hidden() { lastDefinition().toggleHidden(); }
@@ -1597,7 +1602,7 @@ names start and end with with parentheses.
 
 // (lit) ( -- x )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // This instruction gets the value of the next cell, puts that on the data
 // stack, and then moves the instruction pointer to the next instruction.  It
@@ -1611,7 +1616,7 @@ void doLiteral() {
 
 // (branch) ( -- )
 // 
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Used by branching/looping constructs.  Unconditionally adds an offset to
 // `next`.  The offset is in the cell following the instruction.
@@ -1624,7 +1629,7 @@ void branch() {
 
 // (zbranch) ( flag -- )
 // 
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Used by branching/looping constructinos.  Adds an offset to `next` if the
 // top-of-stack value is zero.  The offset is in the cell following the
@@ -1728,7 +1733,7 @@ void toBody() {
 
 // XT>NAME ( xt -- c-addr u )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Gives the name associated with an xt.
 void xtToName() {
@@ -1874,9 +1879,10 @@ Cell digitValue(Char c) {
 
 // >UNUM ( u0 c-addr1 u1 -- u c-addr2 u2 )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
-// This word is similar to ANS Forth's >NUMBER, but provides a single-cell result.
+// This word is similar to the standard >NUMBER, but provides a single-cell
+// result.
 void parseUnsignedNumber() {
     REQUIRE_DSTACK_DEPTH(3, ">UNUM");
 
@@ -1904,7 +1910,7 @@ void parseUnsignedNumber() {
 
 // >NUM ( n c-addr1 u1 -- n c-addr2 u2 )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 // 
 // Similar to >UNUM, but looks for a '-' character at the beginning, and
 // negates the result if found.
@@ -1927,7 +1933,7 @@ void parseSignedNumber() {
 
 // INTERPRET ( i*x -- j*x )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Reads words from the input buffer and executes/compiles them.
 void interpret() {
@@ -2026,7 +2032,7 @@ top-level loop.
 
 // PROMPT ( -- )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Displays "ok" prompt if in interpretation mode.
 void prompt() {
@@ -2080,8 +2086,7 @@ File Access Words
 One of my goals is to make cxxforth useful for writing simple shell-like
 scripts and utilities, and so being able to read and write files and execute
 Forth scripts are necessities.  So I am providing a subset of the [File-Access
-and File-Access extension wordsets][dpansFileAccess] from the ANS Forth draft
-standard.
+and File-Access extension wordsets][dpansFileAccess] from the standards.
 
 [dpansFileAccess]: http://forth.sourceforge.net/std/dpans/dpans11.htm "File Access words"
 
@@ -2195,7 +2200,7 @@ void readLine() {
 
 // READ-CHAR ( fileid -- char ior )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Reads a single character from the specified file.
 // On success, ior is 0 and char is the character read.
@@ -2235,7 +2240,7 @@ void writeLine() {
 
 // WRITE-CHAR ( char fileid -- ior )
 //
-// Not an ANS Forth word.
+// Not a standard word.
 //
 // Writes a single character to the specified file.
 void writeChar() {
@@ -2476,9 +2481,9 @@ using Forth.  To do this, we will create an array of Forth text lines to be
 evaluated when cxxforth initializes itself.
 
 In this section, we won't go into the details of every word defined.  In most
-cases, referring to the ANS Forth draft standard will be enough to understand
-what the word is supposed to do and the definition will be easy to understand.
-But we will provide commentary for a few complicated definitions.
+cases, referring to the standards will be enough to understand what the word is
+supposed to do and the definition will be easy to understand.  But we will
+provide commentary for a few complicated definitions.
 
 Writing Forth definitions as C++ strings is a little awkward in that we have to
 escape every `"` and backslash with a backslash.
@@ -2607,7 +2612,7 @@ can implement this using `CREATE...DOES>`.
 
 /****
 
-`/CELL` is not an ANS Forth word, but it is useful to be able to get the size
+`/CELL` is not a standard word, but it is useful to be able to get the size
 of a cell without using `1 CELLS`.
 
 ****/
@@ -2747,8 +2752,7 @@ as a pointer to a function pointer.
 
 `DEFER` and `IS` are not ANS Forth standard words, but are in common use, and
 are described formally in a proposal at
-<https://www.complang.tuwien.ac.at/forth/ansforth-precvs/deferred.html>.  The
-definitions here are based upon those in that proposal.
+<http://forth-standard.org/standard/core/DEFER>.
 
 ****/
 
@@ -2876,7 +2880,7 @@ To-Do: `(` should support multi-line comments.
 
 /****
 
-`ABOUT` is not an ANS Forth word.  It just prints licensing and credit information.
+`ABOUT` is not a standard word.  It just prints licensing and credit information.
 
 ****/
 
@@ -2911,7 +2915,7 @@ To-Do: `(` should support multi-line comments.
 
 The C++ main() function will look for the Forth word `MAIN` and execute it.
 
-The `MAIN` word calls `PROCESS-ARGS`, which is not an ANS Forth word.  It looks
+The `MAIN` word calls `PROCESS-ARGS`, which is not a standard word.  It looks
 at the number of command-line arguments.  If there are no arguments other than
 the executable path, then it prints the `WELCOME` message.  If there are
 arguments, then it attempts to call `INCLUDED` on each of them.
