@@ -2651,29 +2651,36 @@ In interpretation mode, it just returns the address and length of the string in
 the input buffer.
 
 In compilation mode, we have to copy the string somewhere where it can be found
-at execution time.  The way we do this is to compile a forward-branch
-instruction, then copy the string's characters into the word definition between
-the branch and its target instruction, then at the branch target location we
-use `LITERAL` to put the address and length of the word in the definition onto
-the stack.
+at execution time.  The word `SLITERAL` implements this.  It compiles a
+forward-branch instruction, then copies the string's characters into the
+current definition between the branch and its target instruction, then at the
+branch target location we use a couple of `LITERAL`s to put the address and
+length of the word in the definition onto the stack.
 
-`." ( "ccc<quote> -- )`
+`." ( "ccc<quote>" -- )`
 
 This word prints the given string.  We can implement it in terms of `S"` and
 `TYPE`.
 
+`.( ( "ccc<quote>" -- )`
+
+This is like `."`, but is an immediate word.  It can be used to display output
+during the compilation of words.
+
+    
+        ": sliteral",
+        "    >r",
+        "    ['] (branch) , here >r 0 ,",  // compile a branch with dummy offset
+        "    r> r> 2dup >r >r",
+        "    swap cell+ swap",             // copy into the first byte after the offset
+        "    dup allot  cmove align",      // allocate dataspace and copy string into it
+        "    r> dup postpone then",        // resolve the branch
+        "    cell+ postpone literal",      // compile literal for address
+        "    r> postpone literal",         // compile literal for length
+        "; immediate",
     
         ": s\"   [char] \" parse",
-        "        state @ if",
-        "            >r",
-        "            ['] (branch) , here >r 0 ,",  // compile a branch with dummy offset
-        "            r> r> 2dup >r >r",
-        "            swap cell+ swap",             // copy into the first byte after the offset
-        "            dup allot  cmove align",      // allocate dataspace and copy string into it
-        "            r> dup postpone then",        // resolve the branch
-        "            cell+ postpone literal",      // compile literal for address
-        "            r> postpone literal",         // compile literal for length
-        "        then ; immediate",
+        "        state @ if postpone sliteral then ; immediate",
     
         ": .\"   postpone s\" postpone type ; immediate",
     
