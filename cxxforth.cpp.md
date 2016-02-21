@@ -2229,6 +2229,59 @@ file is greater than the maximum value that can be stored in a cell.
     #endif // #ifndef CXXFORTH_DISABLE_FILE_ACCESS
     
 
+Memory Allocation
+-----------------
+
+By default, cxxforth's data space is 16K cells.  This may be enough for
+moderate needs, but to process large chunks of data it may be insufficent.  One
+way around this is to define `CXXFORTH_DATASPACE_SIZE` to the size you need,
+but a better solution might be to allocate and free memory as needed.
+
+`ALLOCATE`, `RESIZE` and `FREE` are Forth wrappers for C++'s `std::malloc()`,
+`std::realloc()`, and `std::free()`.
+
+    
+    // ALLOCATE ( u -- a-addr ior )
+    void memAllocate() {
+        REQUIRE_DSTACK_DEPTH(1, "ALLOCATE");
+        REQUIRE_DSTACK_AVAILABLE(1, "ALLOCATE");
+        auto size = SIZE_T(*dTop);
+        auto p = std::malloc(size);
+        if (p) {
+            *dTop = CELL(p);
+            push(0);
+        }
+        else {
+            *dTop = 0;
+            push(static_cast<Cell>(-1));
+        }
+    }
+    
+    // RESIZE ( a-addr1 u -- a-addr2 ior )
+    void memResize() {
+        REQUIRE_DSTACK_DEPTH(2, "RESIZE");
+        auto size = SIZE_T(*dTop);
+        auto addr = AADDR(*(dTop - 1));
+        auto p = std::realloc(addr, size);
+        if (p) {
+            *dTop = 0;
+            *(dTop - 1) = CELL(p);
+        }
+        else {
+            *dTop = static_cast<Cell>(-1);
+            *(dTop - 1) = 0;
+        }
+    }
+    
+    // FREE ( a-addr -- ior )
+    void memFree() {
+        REQUIRE_DSTACK_DEPTH(1, "FREE");
+        auto addr = AADDR(*dTop);
+        std::free(addr);
+        *dTop = 0;
+    }
+    
+
 Initialization
 --------------
 
@@ -2291,6 +2344,7 @@ working system.
             {"accept",          accept},
             {"align",           align},
             {"aligned",         aligned},
+            {"allocate",        memAllocate},
             {"allot",           allot},
             {"and",             bitwiseAnd},
             {"arg",             argAtIndex},
@@ -2313,6 +2367,7 @@ working system.
             {"exit",            exit},
             {"fill",            fill},
             {"find",            find},
+            {"free",            memFree},
             {"here",            here},
             {"hidden",          hidden},
             {"interpret",       interpret},
@@ -2328,6 +2383,7 @@ working system.
             {"r>",              rFrom},
             {"r@",              rFetch},
             {"refill",          refill},
+            {"resize",          memResize},
             {"roll",            roll},
             {"rshift",          rshift},
             {"see",             see},
@@ -2744,6 +2800,10 @@ To-Do: `(` should support multi-line comments.
 
 `ABOUT` is not a standard word.  It just prints licensing and credit information.
 
+`.DQUOT` is also not a standard word.  It prints a double-quote (") character.
+
+    
+        ": .dquot   [char] \" emit ;",
     
         ": about",
         "      cr",
@@ -2763,7 +2823,7 @@ To-Do: `(` should support multi-line comments.
         "      .\" overt act of relinquishment in perpetuity of all present and future rights to\" cr",
         "      .\" this software under copyright law.\" cr",
         "      cr",
-        "      .\" THE SOFTWARE IS PROVIDED 'AS IS' WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\" cr",
+        "      .\" THE SOFTWARE IS PROVIDED \" .dquot .\" AS IS\" .dquot .\"  WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\" cr",
         "      .\" IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\" cr",
         "      .\" FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\" cr",
         "      .\" AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN\" cr",
@@ -2786,7 +2846,8 @@ it.
     
         ": welcome",
         "    .\" cxxforth " CXXFORTH_VERSION "\" cr",
-        "    .\" Type \'about\' for more information.  Type \'bye\' to exit.\" cr ;",
+        "    .\" Type \" .dquot .\" about\" .dquot .\"  for more information.  \"",
+        "    .\" Type \" .dquot .\" bye\" .dquot .\"  to exit.\" cr ;",
     
         ": process-args",
         "    #args 1 = if welcome exit then",
