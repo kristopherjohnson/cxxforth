@@ -1722,7 +1722,7 @@ look up elements by name, or traverse the list to perform some operation.
     //
     // Not a standard word.
     //
-    // Gives the name associated with an xt.
+    // Gives the name associated with an XT.
     void xtToName() {
         REQUIRE_DSTACK_DEPTH(1, "XT>NAME");
         REQUIRE_DSTACK_AVAILABLE(1, "XT>NAME");
@@ -1743,11 +1743,12 @@ look up elements by name, or traverse the list to perform some operation.
 SEE
 ---
 
-Most Forth systems provide a word `SEE` that will print out the definition of a word.
+Most Forth systems provide a word `SEE` that will print out the definition of a
+word.
 
-My implementation of this word just walks through the contents of a definition
-and tries to "decompile" each cell.  If the cell contains the XT of a defined
-word, then print that word's name.  Otherwise, it just prints the cell value.
+My implementation of this word walks through the contents of a definition and
+tries to "decompile" each cell.  If the cell contains the XT of a defined word,
+then it prints that word's name.  Otherwise, it just prints the cell value.
 
 This generally gives a readable view of the word's definition, but it is not
 exactly equal to the original source text.  For example, for this definition:
@@ -1761,6 +1762,13 @@ exactly equal to the original source text.  For example, for this definition:
 It gets even messier when decompiling words that contain branches and string
 literals, but it works well as a debugging tool when trying to determine why a
 word is not compiling as expected.
+
+Note that the kernel doesn't know about `IF`...`THEN`, or
+`BEGIN`...`WHILE`...`THEN`, or `CONSTANT`, or `VARIABLE`, or various other
+constructs that would be needed to provide a more accurate representation of
+the original definition.  A better definition of `SEE` would need to be written
+in Forth, after those constructs have been defined.  But I haven't done that
+yet.
 
     
     // Given a cell that might be an XT, search for it in the definitions list.
@@ -2063,8 +2071,8 @@ File Access Words
 
 One of my goals is to make cxxforth useful for writing simple shell-like
 scripts and utilities, and so being able to read and write files and execute
-Forth scripts are necessities.  So I am providing a subset of the [File-Access
-and File-Access extension wordsets][dpansFileAccess] from the standards.
+Forth scripts is a necessity.  I am providing a subset of the [File-Access and
+File-Access extension wordsets][dpansFileAccess] from the standards.
 
 [dpansFileAccess]: http://forth.sourceforge.net/std/dpans/dpans11.htm "File Access words"
 
@@ -2073,12 +2081,9 @@ words.  This means that a Forth _fileid_ is going to be a pointer to a
 `std::fstream` instance.
 
 On some platforms, the C++ iostreams library may be unavailable or incomplete,
-or the overhead of linking in these words may be too great.  In that case,
+or you may not want the overhead of linking in these functions.  In that case,
 define the macro `CXXFORTH_DISABLE_FILE_ACCESS` to disable compilation of these
 words.
-
-Words related to file position and size have undefined results if the size of a
-file is greater than the maximum value that can be stored in a cell.
 
     
     #ifndef CXXFORTH_DISABLE_FILE_ACCESS
@@ -2506,13 +2511,13 @@ working system.
 The Forth Part
 --------------
 
-With our C++ kernel defined, now we can define the remainder of the system
-using Forth.  To do this, we will create an array of Forth text lines to be
-evaluated when cxxforth initializes itself.
+With our C++ kernel defined, now I can define the remainder of the system using
+Forth.  To do this, I will create an array of Forth text lines to be evaluated
+when cxxforth initializes itself.
 
-In this section, we won't go into the details of every word defined.  In most
+In this section, I won't go into the details of every word defined.  In most
 cases, referring to the standards will be enough to understand what the word is
-supposed to do and the definition will be easy to understand.  But we will
+supposed to do and the definition will be easy to understand.  But I will
 provide commentary for a few complicated definitions.
 
 Writing Forth definitions as C++ strings is a little awkward in that we have to
@@ -2523,7 +2528,7 @@ escape every `"` and backslash with a backslash.
     
 
 I'll start by defining the remaining basic stack operations.  `PICK` and
-`ROLL` are the basis for most of them.
+`ROLL` are the basis for many of them.
 
 Note that while I'm not implementing any of the Forth double-cell arithmetic
 operations, double-cell stack operations are still useful.
@@ -2604,7 +2609,8 @@ right.
         ": 2/   1 rshift ;",
     
 
-A Forth variable is just a named location in dataspace.  We'll use `CREATE` and reserve a cell.
+A Forth variable is just a named location in dataspace.  I will use `CREATE`
+and reserve a cell.
 
     
         ": variable   create 0 , ;",
@@ -2612,8 +2618,8 @@ A Forth variable is just a named location in dataspace.  We'll use `CREATE` and 
     
 
 A Forth constant is similar to a variable in that it is a value stored in
-dataspace, but using the name automatically puts the value on the stack.  We
-can implement this using `CREATE...DOES>`.
+dataspace, but using the name automatically puts the value on the stack.  I can
+implement this using `CREATE...DOES>`.
 
     
         ": constant    create ,    does>  @ ;",
@@ -2627,7 +2633,7 @@ of a cell without using `1 CELLS`.
         "1 cells   constant /cell",
     
 
-`DECIMAL` and `HEX` will switch the numeric base to 10 or 16, respectively.
+`DECIMAL` and `HEX` switch the numeric base to 10 or 16, respectively.
 
     
         ": decimal   10 base ! ;",
@@ -2649,17 +2655,20 @@ of a cell without using `1 CELLS`.
         ": '   bl word find drop ;",
     
 
-The word `LITERAL` takes a cell from the stack at compile time, and at runtime will put that value onto the stack.
-We implement this by compiling a call to `(lit)` word followed by the value.
+The word `LITERAL` takes a cell from the stack at compile time, and at runtime
+will put that value onto the stack.  I implement this by compiling a call to
+`(lit)` word followed by the value.
 
-Because we'll be using `(lit)` in other word definitions, we'll create a constant `'(lit)` containing its XT.
+Because I will be using `(lit)` in other word definitions, I'll create a
+constant `'(lit)` containing its XT.
 
     
         "' (lit)     constant '(lit)",
         ": literal   '(lit) , , ; immediate",
     
 
-`[']` is like `'`, but causes the XT to be put on the stack at runtime.
+`[']` is like `'`, but is an immediate compiling word that causes the XT to beR
+put on the stack at runtime.
 
     
         ": [']   ' '(lit) , , ; immediate",
@@ -2669,6 +2678,12 @@ Because we'll be using `(lit)` in other word definitions, we'll create a constan
 
     
         ": recurse     latest , ; immediate",
+    
+
+`CHAR` gets the next character and puts its ASCII value on the stack.
+
+`[CHAR]` is like `CHAR`, but is an immediate compiling word.
+
     
         ": char     bl word char+ c@ ;",
         ": [char]   char '(lit) , , ; immediate",
@@ -2690,11 +2705,12 @@ See the [Control Structures[jonesforthControlStructures] section of
         ": begin    here ; immediate",
         ": again    ['] (branch) ,  here - , ; immediate",
         ": until    ['] (zbranch) ,  here - , ; immediate",
-        ": while    ['] (zbranch) ,  here 0 , ; immediate",
-        ": repeat   ['] (branch) ,  swap here - ,  dup  here swap -  swap ! ; immediate",
+        ": while    ['] (zbranch) ,  here swap  0 , ; immediate",
+        ": repeat   ['] (branch) ,  here - ,  dup  here swap -  swap ! ; immediate",
     
 
-Here are some more words we can define now that we have control structures.
+Here are some common Forth words I can define now that we have control
+structures.
 
         
         ": ?dup       dup 0<> if dup then ;",
@@ -2708,7 +2724,8 @@ Here are some more words we can define now that we have control structures.
         ": spaces     begin  dup 0> while  space 1-  repeat  drop ;",
     
 
-I wish I could explain `POSTPONE`, but I can't, so you will just have to google it.
+I wish I could explain Forth's `POSTPONE`, but I can't, so you will just have
+to Google it.
 
     
         ": postpone   bl word find  1 = if , else  '(lit) , ,  ['] , ,  then ; immediate",
@@ -2724,6 +2741,7 @@ could use `TO` to change the value of a constant, but that's against the rules.
         ": value    constant ;",
     
         ": value!   >body ! ;",
+    
         ": to       state @ if",
         "               postpone ['] postpone value!",
         "           else",
@@ -2737,8 +2755,7 @@ can be used to change the execution token.  In C++ terms, you can think of this
 as a pointer to a function pointer.
 
 `DEFER` and `IS` are not ANS Forth standard words, but are in common use, and
-are described formally in a proposal at
-<http://forth-standard.org/standard/core/DEFER>.
+are described formally at <http://forth-standard.org/standard/core/DEFER>.
 
     
         ": defer       create ['] abort ,",
@@ -2746,6 +2763,7 @@ are described formally in a proposal at
     
         ": defer@      >body @ ;",
         ": defer!      >body ! ;",
+    
         ": is          state @ if",
         "                  postpone ['] postpone defer!",
         "              else",
@@ -2879,7 +2897,8 @@ To-Do: `(` should support multi-line comments.
         ": (    [char] ) parse 2drop ; immediate",
     
 
-`ABOUT` is not a standard word.  It just prints licensing and credit information.
+`ABOUT` is not a standard word.  It just prints licensing and credit
+information.
 
 `.DQUOT` is also not a standard word.  It prints a double-quote (") character.
 
@@ -2945,10 +2964,10 @@ it.
     
     
 
-That is the end of our built-in Forth definitions.
+That is the end of the built-in Forth definitions.
 
-With the `forthDefinitions` array filled, all we need to do is call
-`EVALUATE` on each line to load them into the system.
+With the `forthDefinitions` array filled, all I need to do is call `EVALUATE`
+on each line to load them into the system.
 
     
     void defineForthWords() {
