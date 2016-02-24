@@ -58,9 +58,11 @@ variable incode?   \ flag: Are we in a C++ section?
 256 constant #linebuf
 create linebuf  #linebuf 2 +  chars allot
 
+\ Read next input line.
+\ Return ( caddr length true ) on success.
+\ Return ( caddr 0 false ) at end-of-file
 : input-line ( -- caddr length flag )
-    linebuf #linebuf infile @ read-line read-error?
-    >r >r linebuf r> r>
+    linebuf dup #linebuf infile @ read-line read-error?
 ;
 
 \ Perform the conversion described above.
