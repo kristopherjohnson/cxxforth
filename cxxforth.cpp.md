@@ -46,7 +46,7 @@ An inspiration for this implementation is Richard W.M. Jones's
 [JONESFORTH][jonesforth].  JONESFORTH is a Forth implementation written as a
 very readable tutorial, and I am adopting its style for our higher-level
 implementation.  This Forth kernel is written as a [C++ file](cxxforth.cpp)
-with large comment blocks, and there is a utility, [cpp2md](cpp2md.cpp.md),
+with large comment blocks, and there is a utility, [cpp2md](cpp2md.fs),
 that takes that C++ file and converts it to a [Markdown][markdown]-format
 document [cxxforth.cpp.md](cxxforth.cpp.md) with nicely formatted commentary
 sections between the C++ code blocks.
