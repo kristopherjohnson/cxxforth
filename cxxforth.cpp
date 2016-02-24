@@ -1349,25 +1349,11 @@ void lessThan() {
     *dTop = static_cast<SCell>(*dTop) < n2 ? True : False;
 }
 
-// > ( n1 n2 -- flag )
-void greaterThan() {
-    REQUIRE_DSTACK_DEPTH(2, ">");
-    auto n2 = static_cast<SCell>(*dTop); pop();
-    *dTop = static_cast<SCell>(*dTop) > n2 ? True : False;
-}
-
 // U< ( u1 u2 -- flag )
 void uLessThan() {
     REQUIRE_DSTACK_DEPTH(2, "U<");
     auto u2 = static_cast<Cell>(*dTop); pop();
     *dTop = static_cast<Cell>(*dTop) < u2 ? True : False;
-}
-
-// U> ( u1 u2 -- flag )
-void uGreaterThan() {
-    REQUIRE_DSTACK_DEPTH(2, "U>");
-    auto u2 = static_cast<Cell>(*dTop); pop();
-    *dTop = static_cast<Cell>(*dTop) > u2 ? True : False;
 }
 
 /****
@@ -2519,7 +2505,6 @@ void definePrimitives() {
         {":noname",         noname},
         {"<",               lessThan},
         {"=",               equals},
-        {">",               greaterThan},
         {">body",           toBody},
         {">in",             toIn},
         {">num",            parseSignedNumber},
@@ -2579,7 +2564,6 @@ void definePrimitives() {
         {"time&date",       timeAndDate},
         {"type",            type},
         {"u<",              uLessThan},
-        {"u>",              uGreaterThan},
         {"u.",              uDot},
         {"unused",          unused},
         {"utctime&date",    utcTimeAndDate},
@@ -2727,6 +2711,8 @@ mapping to CPU opcodes, but in this system, they are just abbreviations.
 
 ****/
 
+    ": >     2dup 2>r < 2r> = or invert ;",
+    ": u>    2dup 2>r u< 2r> = or invert ;",
     ": <>    = invert ;",
     ": 0<    0 < ;",
     ": 0>    0 > ;",
