@@ -2269,14 +2269,13 @@ void readLine() {
     }
     auto length = SIZE_T(*(dTop - 1));
     auto caddr = CHARPTR(*(dTop - 2));
-    f->getline(caddr, static_cast<std::streamsize>(length));
-    auto readCount = static_cast<Cell>(f->gcount());
+    f->getline(caddr, static_cast<std::streamsize>(length) + 1);
     if (f->bad()) {
         *dTop = static_cast<Cell>(-1);
         *(dTop - 1) = 0;
         *(dTop - 2) = 0;
     }
-    else if (f->eof() && readCount == 0) {
+    else if (f->eof() && std::strlen(caddr) == 0) {
         *dTop = 0;
         *(dTop - 1) = False;
         *(dTop - 2) = 0;
@@ -2284,7 +2283,7 @@ void readLine() {
     else {
         *dTop = 0;
         *(dTop - 1) = True;
-        *(dTop - 2) = static_cast<Cell>(readCount);
+        *(dTop - 2) = std::strlen(caddr);
     }
 }
 
