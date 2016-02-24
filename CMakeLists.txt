@@ -2,20 +2,12 @@ cmake_minimum_required(VERSION 3.0)
 project(cxxforth)
 
 add_executable(cxxforth cxxforth.cpp)
-add_executable(cpp2md   cpp2md.cpp)
 
-add_custom_target(cxxforth.cpp.md ALL build/cpp2md cxxforth.cpp cxxforth.cpp.md
-    DEPENDS cxxforth.cpp cpp2md
+add_custom_target(cxxforth.cpp.md ALL build/cxxforth cpp2md.fs
+    DEPENDS cxxforth.cpp cpp2md.fs
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generate cxxforth.cpp.md" VERBATIM
     SOURCES cxxforth.cpp
-)
-
-add_custom_target(cpp2md.cpp.md ALL build/cpp2md cpp2md.cpp cpp2md.cpp.md
-    DEPENDS cpp2md
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Generate cpp2md.cpp.md" VERBATIM
-    SOURCES cpp2md.cpp
 )
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")

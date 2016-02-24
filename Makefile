@@ -20,7 +20,7 @@ BUILDDIR ?= build
 OPTIMIZEDDIR ?= build_optimized
 
 .PHONY: default
-default: targets tags
+default: targets
 
 .PHONY: all
 all: targets optimized tags
