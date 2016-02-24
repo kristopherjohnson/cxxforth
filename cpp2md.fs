@@ -53,10 +53,15 @@ variable infile    \ input file ID
 variable outfile   \ output file ID
 variable incode?   \ flag: Are we in a C++ section?
 
-\ Buffer for read-line.
+\ Buffer for input-line.
 \ Actual size needs to be 2 characters larger than the usable size.
 256 constant #linebuf
 create linebuf  #linebuf 2 +  chars allot
+
+: input-line ( -- caddr length flag )
+    linebuf #linebuf infile @ read-line read-error?
+    >r >r linebuf r> r>
+;
 
 \ Perform the conversion described above.
 \ infile and outfile must already contain the file IDs of
@@ -64,9 +69,8 @@ create linebuf  #linebuf 2 +  chars allot
 : convert-to-markdown ( -- )
     true incode? !
     begin
-        linebuf #linebuf infile @ read-line read-error?
+        input-line
     while
-        linebuf swap           ( caddr u )
         2dup comment-start?
         if
             false incode? !
@@ -84,7 +88,7 @@ create linebuf  #linebuf 2 +  chars allot
         then
         2drop
     repeat
-    drop
+    2drop
 ;
 
 \ Main entry point
