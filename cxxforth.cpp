@@ -1496,10 +1496,16 @@ instruction to be executed.  But that's not easy to do in a portable way in
 C++, so my `doColon()` just keeps going until it sees an `EXIT` instruction,
 then returns to the caller without actually executing it.
 
+In many Forth implementations, the return stack is used to store the address of
+the next instruction to be invoked upon returning from the routine.  But in
+C++, we can just use a temporary variable to achieve the same thing.  So in
+this Forth, the return stack is really just a secondary stack; it doesn't have
+anything to do with "returning".
+
 ****/
 
 void doColon() {
-    rpush(CELL(next));
+    auto savedNext = next;
 
     auto defn = Definition::executingWord;
 
@@ -1508,7 +1514,7 @@ void doColon() {
         (*(next++))->execute();
     }
 
-    next = reinterpret_cast<Xt*>(*rTop); rpop();
+    next = savedNext;
 }
 
 // EXIT ( -- ) ( R: nest-sys -- )
