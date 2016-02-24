@@ -2256,16 +2256,36 @@ void readFile() {
     *(dTop - 1) = static_cast<Cell>(f->gcount());
 }
 
-// READ-LINE ( c-addr u1 fileid -- u2 ior )
+// READ-LINE ( c-addr u1 fileid -- u2 flag ior )
 void readLine() {
     REQUIRE_DSTACK_DEPTH(3, "READ-FILE");
-    auto f = FILEID(*dTop); pop();
+    auto f = FILEID(*dTop);
     if (f == nullptr) throw AbortException("READ-FILE: not a valid file ID");
-    auto length = SIZE_T(*dTop);
-    auto caddr = CHARPTR(*(dTop - 1));
+    if (f->eof()) {
+        *dTop = 0;
+        *(dTop - 1) = False;
+        *(dTop - 2) = 0;
+        return;
+    }
+    auto length = SIZE_T(*(dTop - 1));
+    auto caddr = CHARPTR(*(dTop - 2));
     f->getline(caddr, static_cast<std::streamsize>(length));
-    *dTop = f->bad() ? Cell(-1) : 0;
-    *(dTop - 1) = static_cast<Cell>(f->gcount());
+    auto readCount = static_cast<Cell>(f->gcount());
+    if (f->bad()) {
+        *dTop = static_cast<Cell>(-1);
+        *(dTop - 1) = 0;
+        *(dTop - 2) = 0;
+    }
+    else if (f->eof() && readCount == 0) {
+        *dTop = 0;
+        *(dTop - 1) = False;
+        *(dTop - 2) = 0;
+    }
+    else {
+        *dTop = 0;
+        *(dTop - 1) = True;
+        *(dTop - 2) = static_cast<Cell>(readCount);
+    }
 }
 
 // READ-CHAR ( fileid -- char ior )
