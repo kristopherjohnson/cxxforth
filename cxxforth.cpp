@@ -307,7 +307,7 @@ Boolean flag.
 ****/
 
 constexpr Cell False = 0;
-constexpr Cell True = ~False;
+constexpr Cell True  = ~False;
 
 /****
 
@@ -425,12 +425,12 @@ std::list<Definition> definitions;
 
 For each of the global arrays, I need a pointer to the current location.
 
-For the data space, we have the `dataPointer`, which corresponds to Forth's
+For the data space, I have the `dataPointer`, which corresponds to Forth's
 `HERE`.
 
-For each of the stacks, we need a pointer to the element at the top of the
+For each of the stacks, I need a pointer to the element at the top of the
 stack.  The stacks grow upward.  When a stack is empty, the associated pointer
-points to an address below the actual bottom of the array, so we will need to
+points to an address below the actual bottom of the array, so I will need to
 avoid dereferencing these pointers under those circumstances.
 
 ****/
@@ -665,10 +665,10 @@ mistakes and so don't want the overhead of bounds-checking or other nanny
 hand-holding.  However, I'm just a dumb C++ programmer, and I'd like some help
 to catch mistakes.
 
-To that end, I have a set of macros and functions that verify that we have the
-expected number of arguments available on our stacks, that we aren't going to
-run off the end of an array, that we aren't going to try to divide by zero, and
-so on.
+To that end, I have a set of macros and functions that verify that I have the
+expected number of arguments available on the stacks, that I'm not going to run
+off the end of an array, that I'm not going to try to divide by zero, and so
+on.
 
 You can define the macro `CXXFORTH_SKIP_RUNTIME_CHECKS` to generate an
 executable that doesn't include these checks, so when you have a fully debugged
@@ -754,7 +754,7 @@ Forth Primitives
 
 Now I will start defining the primitive operations that are exposed as Forth
 words.  You can think of these as the opcodes of a virtual Forth processor.
-Once we have our primitive operations defined, we can then write definitions in
+Once I have the primitive operations defined, I can then write definitions in
 Forth that use these primitives to build more-complex words.
 
 Each of these primitives is a function that takes no arguments and returns no
@@ -1484,8 +1484,8 @@ then returns to the caller without actually executing it.
 
 In many Forth implementations, the return stack is used to store the address of
 the next instruction to be invoked upon returning from the routine.  But in
-C++, we can just use a temporary variable to achieve the same thing.  So in
-this Forth, the return stack is really just a secondary stack; it doesn't have
+C++, I can just use a temporary variable to achieve the same thing.  So in this
+Forth, the return stack is really just a secondary stack; it doesn't have
 anything to do with "returning".
 
 ****/
@@ -1515,7 +1515,7 @@ void exit() {
 Compilation
 -----------
 
-Now that we see how the inner interpreter works, I can define the words that
+Now that we know how the inner interpreter works, I can define the words that
 compile definitions to be executed by that interpreter.
 
 The kernel provides three words that can add a word to the dictionary:
@@ -1905,7 +1905,7 @@ characters in the buffer:
 - Parse a space-delimited word.
 - Look up that word in the dictionary.
 - If the word is found:
-   - If we are not in compilation mode, or if the word is an immediate word, then execute it.
+   - If not in compilation mode, or if the word is an immediate word, then execute it.
    - Otherwise (in compilation mode), compile a call to the word.
 - If the word is not found:
    - Try to parse it as a number.
@@ -2155,7 +2155,7 @@ File-Access extension wordsets][dpansFileAccess] from the standards.
 
 [dpansFileAccess]: http://forth.sourceforge.net/std/dpans/dpans11.htm "File Access words"
 
-As with our user input, we'll use C++ iostreams to implement the file access
+As with the user input, I will use C++ iostreams to implement the file access
 words.  This means that a Forth _fileid_ is going to be a pointer to a
 `std::fstream` instance.
 
@@ -2457,7 +2457,7 @@ void memFree() {
 Initialization
 --------------
 
-In `initializeDefinitions()`, we set up the initial contents of the dictionary.
+In `initializeDefinitions()`, I set up the initial contents of the dictionary.
 This is the Forth kernel that Forth code can use to implement the rest of a
 working system.
 
@@ -2622,7 +2622,7 @@ cases, referring to the standards will be enough to understand what the word is
 supposed to do and the definition will be easy to understand.  But I will
 provide commentary for a few complicated definitions.
 
-Writing Forth definitions as C++ strings is a little awkward in that we have to
+Writing Forth definitions as C++ strings is a little awkward in that I have to
 escape every `"` and backslash with a backslash.
 
 ****/
@@ -2853,7 +2853,7 @@ See the [Control Structures[jonesforthControlStructures] section of
 
 /****
 
-Here are some common Forth words I can define now that we have control
+Here are some common Forth words I can define now that I have control
 structures.
 
 ****/
@@ -2941,11 +2941,11 @@ compilation and interpretation mode.
 In interpretation mode, it just returns the address and length of the string in
 the input buffer.
 
-In compilation mode, we have to copy the string somewhere where it can be found
+In compilation mode, I have to copy the string somewhere where it can be found
 at execution time.  The word `SLITERAL` implements this.  It compiles a
 forward-branch instruction, then copies the string's characters into the
 current definition between the branch and its target instruction, then at the
-branch target location we use a couple of `LITERAL`s to put the address and
+branch target location I use a couple of `LITERAL`s to put the address and
 length of the word in the definition onto the stack.
 
 `." ( "ccc<quote>" -- )`
@@ -3032,17 +3032,17 @@ the following:
 Comments
 --------
 
-There is a good reason that none of our Forth defintions above have had any
-stack diagrams or other comments: our Forth doesn't support comments yet.  We
+There is a good reason that none of the Forth defintions above have had any
+stack diagrams or other comments: our Forth doesn't support comments yet.  I
 have to define words to implement comments.
 
-We will support two standard kinds of Forth comments:
+I will support two standard kinds of Forth comments:
 
 - If `\` (backslash) appears on a line, the rest of the line is ignored.
-- Text between `(` and `)` is ignored.
+- Text between `(` and `)` on a single line is ignored.
 
-Also, we will allow `#!` as a synonym for `\`, so that we can start a
-UNIX shell script with something like this:
+Also, I will support `#!` as a synonym for `\`, so that we can start a UNIX
+shell script with something like this:
 
     #! /usr/local/bin/cxxforth
 
@@ -3097,7 +3097,7 @@ information.
 
 /****
 
-The C++ main() function will look for the Forth word `MAIN` and execute it.
+The C++ `main()` function will look for the Forth word `MAIN` and execute it.
 
 The `MAIN` word calls `PROCESS-ARGS`, which is not a standard word.  It looks
 at the number of command-line arguments.  If there are no arguments other than

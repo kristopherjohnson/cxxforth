@@ -1,4 +1,4 @@
-\ cpp2md converts a C++ source file to a Markdown file.
+\ cpp2md.fs converts a C++ source file to a Markdown file.
 \ 
 \ The rules it follows to do this are simple:
 \ 
@@ -18,7 +18,7 @@
 \ 
 \     gforth cpp2md.fs
 
-: 3drop  drop 2drop ;
+: 3drop   drop 2drop ;
 
 \ Determine whether two strings start with same characters.
 : same-prefix? ( caddr1 u1 caddr2 u2 -- flag )
@@ -46,46 +46,43 @@
 : comment-start? ( caddr u -- flag ) s" /****" same-prefix? ;
 : comment-end?   ( caddr u -- flag ) s" ****/" same-prefix? ;
 
-: read-error? ( ior -- ) abort" Read error" ;
-: write-error? ( ior -- ) abort" Write error" ;
+: abort-read-error  ( ior -- ) abort" Read error" ;
+: abort-write-error ( ior -- ) abort" Write error" ;
 
-variable infile    \ input file ID
-variable outfile   \ output file ID
-variable incode?   \ flag: Are we in a C++ section?
+variable inFile         \ input file ID
+variable outFile        \ output file ID
+variable inCodeSection? \ flag: Are we in a C++ section?
 
-\ Buffer for input-line.
-\ Actual size needs to be 2 characters larger than the usable size.
-256 constant #linebuf
-create linebuf  #linebuf 2 +  chars allot
+\ Buffer for get-input-line.
+\ Actual size must be 2 characters larger than the usable size.
+256 constant #lineBuf
+create lineBuf  #lineBuf 2 +  chars allot
 
 \ Read next input line.
 \ Return ( caddr length true ) on success.
 \ Return ( caddr 0 false ) at end-of-file
-: input-line ( -- caddr length flag )
-    linebuf dup #linebuf infile @ read-line read-error?
+: get-input-line ( -- caddr length flag )
+    lineBuf dup #lineBuf inFile @ read-line abort-read-error
 ;
 
 \ Perform the conversion described above.
-\ infile and outfile must already contain the file IDs of
+\ inFile and outFile must already contain the file IDs of
 \ the input file and output file.
 : convert-to-markdown ( -- )
-    true incode? !
+    true inCodeSection? !
     begin
-        input-line
+        get-input-line
     while
-        2dup comment-start?
-        if
-            false incode? !
+        2dup comment-start? if
+            false inCodeSection? !
         else
-            2dup comment-end?
-            if 
-                true incode? !
+            2dup comment-end? if 
+                true inCodeSection? !
             else
-                incode? @
-                if
-                    s"     " outfile @ write-file write-error?
+                inCodeSection? @ if
+                    s"     " outFile @ write-file abort-write-error
                 then
-                2dup outfile @ write-line write-error?
+                2dup outFile @ write-line abort-write-error
             then
         then
         2drop
@@ -96,15 +93,15 @@ create linebuf  #linebuf 2 +  chars allot
 \ Main entry point
 : go ( -- )
     s" cxxforth.cpp" r/o open-file abort" Unable to open input file"
-    infile !
+    inFile !
 
     s" cxxforth.cpp.md" r/w create-file abort" Unable to open output file"
-    outfile !
+    outFile !
 
     convert-to-markdown
 
-    infile @ close-file drop
-    outfile @ close-file drop
+    inFile @ close-file drop
+    outFile @ close-file drop
 ;
 
 go
