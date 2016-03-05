@@ -225,7 +225,7 @@ in case they have not been defined.
 ****/
 
 #ifndef CXXFORTH_VERSION
-#define CXXFORTH_VERSION "1.1.2"
+#define CXXFORTH_VERSION "1.1.3"
 #endif
 
 #ifndef CXXFORTH_DATASPACE_SIZE
