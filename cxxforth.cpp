@@ -543,6 +543,16 @@ const char** commandLineArgVector = nullptr;
 
 /****
 
+I need a variable to store the result of the last call to `SYSTEM`, which
+the user can retrieve by using `$?`.
+
+****/
+
+int systemResult = 0;
+
+
+/****
+
 ----
 
 Stack Primitives
@@ -1132,7 +1142,7 @@ void accept() {
         *dTop = 0;
     }
 #else
-    std::string line;
+    string line;
     if (std::getline(std::cin, line)) {
         auto copySize = std::min(line.length(), bufferSize);
         std::memcpy(buffer, line.data(), copySize);
@@ -1391,6 +1401,34 @@ void argAtIndex() {
 // BYE ( -- )
 void bye() {
     std::exit(EXIT_SUCCESS);
+}
+
+// SYSTEM ( c-addr u -- )
+// 
+// Not a standard word.
+//
+// Executes a system command in a subshell.
+//
+// See the documentation for the C++ `std::system()` library call for more
+// details.
+void system() {
+    REQUIRE_DSTACK_DEPTH(2, "SYSTEM");
+    auto length = SIZE_T(*dTop); pop();
+    auto caddr = CHARPTR(*dTop); pop();
+    string command(caddr, length);
+    systemResult = std::system(command.c_str());
+}
+
+// $? ( -- n )
+//
+// Not a standard word.
+//
+// Returns an implementation-defined status code from the last call to
+// `SYSTEM`.  See the documentation for the C++ `std::system()` library call
+// for details.
+void lastSystemResult() {
+    REQUIRE_DSTACK_AVAILABLE(1, "$?");
+    push(static_cast<Cell>(static_cast<SCell>(systemResult)));
 }
 
 // MS ( u -- )
@@ -2487,11 +2525,12 @@ void definePrimitives() {
         // ------------------------------
         {"!",               store},
         {"#args",           argCount},
-        {"(zbranch)",       zbranch},
+        {"$?",              lastSystemResult},
+        {"(;)",             endOfDefinition},
         {"(branch)",        branch},
         {"(does)",          setDoes},
         {"(lit)",           doLiteral},
-        {"(;)",             endOfDefinition},
+        {"(zbranch)",       zbranch},
         {"*",               star},
         {"+",               plus},
         {"-",               minus},
@@ -2561,16 +2600,17 @@ void definePrimitives() {
         {"see",             see},
         {"source",          source},
         {"state",           state},
+        {"system",          system},
         {"time&date",       timeAndDate},
         {"type",            type},
-        {"u<",              uLessThan},
         {"u.",              uDot},
+        {"u<",              uLessThan},
         {"unused",          unused},
         {"utctime&date",    utcTimeAndDate},
         {"word",            word},
         {"words",           words},
-        {"xt>name",         xtToName},
         {"xor",             bitwiseXor},
+        {"xt>name",         xtToName},
 #ifndef CXXFORTH_DISABLE_FILE_ACCESS
         {"bin",             bin},
         {"close-file",      closeFile},
