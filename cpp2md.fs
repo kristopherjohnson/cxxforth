@@ -20,10 +20,16 @@
 
 : 3drop   drop 2drop ;
 
+\ Determine whether two addresses point to different characters.
+: mismatch? ( caddr1 caddr2 -- caddr1 caddr2 flag )
+    2dup c@ swap c@ <>
+;
+
 \ Determine whether two strings start with same characters.
 : same-prefix? ( caddr1 u1 caddr2 u2 -- flag )
-    >r swap r> min             ( caddr1 caddr2 u )
+    >r swap r> min             ( caddr1 caddr2 len )
 
+    \ If either string is empty, return false.
     dup 0= if
         3drop
         false exit
@@ -32,12 +38,13 @@
     begin
         dup 0>
     while
-        >r 2dup c@ swap c@     ( caddr1 caddr2 char2 char1 ) ( R: u )
-        <> if
+        >r                     ( caddr1 caddr2 ) ( R: len )
+        mismatch? if
             2drop r> drop
             false exit
         then
-        char+ swap char+ r> 1- ( caddr2+1 caddr1+1 u-1 )
+        char+ swap char+
+        r> 1-                  ( caddr2+1 caddr1+1 len-1 )
     repeat
     3drop
     true
@@ -46,8 +53,10 @@
 : comment-start? ( caddr u -- flag ) s" /****" same-prefix? ;
 : comment-end?   ( caddr u -- flag ) s" ****/" same-prefix? ;
 
-: abort-read-error  ( ior -- ) abort" Read error" ;
-: abort-write-error ( ior -- ) abort" Write error" ;
+: check-input  ( ior -- ) abort" Unable to open input file" ;
+: check-output ( ior -- ) abort" Unable to open output file" ;
+: check-read   ( ior -- ) abort" Read error" ;
+: check-write  ( ior -- ) abort" Write error" ;
 
 variable inFile         \ input file ID
 variable outFile        \ output file ID
@@ -55,14 +64,14 @@ variable inCodeSection? \ flag: Are we in a C++ section?
 
 \ Buffer for get-input-line.
 \ Actual size must be 2 characters larger than the usable size.
-256 constant #lineBuf
+510 constant #lineBuf
 create lineBuf  #lineBuf 2 +  chars allot
 
 \ Read next input line.
 \ Return ( caddr length true ) on success.
 \ Return ( caddr 0 false ) at end-of-file
 : get-input-line ( -- caddr length flag )
-    lineBuf dup #lineBuf inFile @ read-line abort-read-error
+    lineBuf dup #lineBuf inFile @ read-line check-read
 ;
 
 \ Perform the conversion described above.
@@ -80,9 +89,9 @@ create lineBuf  #lineBuf 2 +  chars allot
                 true inCodeSection? !
             else
                 inCodeSection? @ if
-                    s"     " outFile @ write-file abort-write-error
+                    s"     " outFile @ write-file check-write
                 then
-                2dup outFile @ write-line abort-write-error
+                2dup outFile @ write-line check-write
             then
         then
         2drop
@@ -92,11 +101,8 @@ create lineBuf  #lineBuf 2 +  chars allot
 
 \ Main entry point
 : go ( -- )
-    s" cxxforth.cpp" r/o open-file abort" Unable to open input file"
-    inFile !
-
-    s" cxxforth.cpp.md" r/w create-file abort" Unable to open output file"
-    outFile !
+    s" cxxforth.cpp" r/o open-file check-input inFile !
+    s" cxxforth.cpp.md" r/w create-file check-output outFile !
 
     convert-to-markdown
 
