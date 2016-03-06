@@ -225,7 +225,7 @@ in case they have not been defined.
 ****/
 
 #ifndef CXXFORTH_VERSION
-#define CXXFORTH_VERSION "1.1.3"
+#define CXXFORTH_VERSION "1.1.4"
 #endif
 
 #ifndef CXXFORTH_DATASPACE_SIZE
@@ -2878,6 +2878,14 @@ See the [Control Structures[jonesforthControlStructures] section of
 `jonesforth.f` for an explanation of how these words work.
 
 [jonesforthControlStructures]: http://git.annexia.org/?p=jonesforth.git;a=blob;f=jonesforth.f;h=5c1309574ae1165195a43250c19c822ab8681671;hb=HEAD#l118
+
+One word we have here that is not described in JONESFORTH is `AHEAD`, which is
+essentially equivalent to `FALSE IF`.  It is the start of an unconditional
+forward jump.  It is useful for words, like `SLITERAL` below, that need to
+store data while compiling.  Such words can use `AHEAD`, then use words like
+`,`, `C,`, or `ALLOT` to put data into the dictionary at the current
+compilation point, then use `THEN` so that at runtime the inner interpreter
+will jump over that data.
 
 ****/
 
