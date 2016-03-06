@@ -2750,6 +2750,7 @@ See the [Control Structures[jonesforthControlStructures] section of
         ": if       ['] (zbranch) ,  here  0 , ; immediate",
         ": then     dup  here swap -  swap ! ; immediate",
         ": else     ['] (branch) ,  here 0 ,  swap dup here swap -  swap ! ; immediate",
+        ": ahead    ['] (branch) , here 0 , ; immediate",
     
         ": begin    here ; immediate",
         ": again    ['] (branch) ,  here - , ; immediate",
