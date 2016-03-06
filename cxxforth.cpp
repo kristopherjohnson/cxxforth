@@ -3001,11 +3001,10 @@ during the compilation of words.
 
 ****/
 
-    ": sliteral",
-    "    >r",
-    "    ['] (branch) , here >r 0 ,",  // compile a branch with dummy offset
-    "    r> r> 2dup >r >r",
-    "    swap cell+ swap",             // copy into the first byte after the offset
+    ": sliteral",                      // ( c-addr len )
+    "    postpone ahead",              // ( c-addr len orig )
+    "    2dup swap >r >r",             // ( c-addr len orig ) ( R: len orig )
+    "    cell+ swap",                  // copy into the first byte after the offset
     "    dup allot  cmove align",      // allocate dataspace and copy string into it
     "    r> dup postpone then",        // resolve the branch
     "    cell+ postpone literal",      // compile literal for address
