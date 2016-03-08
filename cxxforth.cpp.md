@@ -2632,6 +2632,15 @@ operations, double-cell stack operations are still useful.
         ": true    -1 ;",
     
 
+`]` enters compilation mode.
+
+`[` exits compilation mode.
+
+    
+        ": ]   true state ! ;",
+        ": [   false state ! ; immediate",
+    
+
 Forth has a few words for incrementing/decrementing the top-of-stack value.
 
     
@@ -2679,7 +2688,7 @@ mapping to CPU opcodes, but in this system, they are just abbreviations.
         ": 0<>   0= invert ;",
     
 
-`2*` and `2/` multiply or divide a value by 2 by just shift the bits left or
+`2*` and `2/` multiply or divide a value by 2 by shifting the bits left or
 right.
 
     
@@ -2716,15 +2725,6 @@ of a cell without using `1 CELLS`.
     
         ": decimal   10 base ! ;",
         ": hex       16 base ! ;",
-    
-
-`]` enters compilation mode.
-
-`[` exits compilation mode.
-
-    
-        ": ]   true state ! ;",
-        ": [   false state ! ; immediate",
     
 
 `'` gets the next word from the input stream and looks up its execution token.
