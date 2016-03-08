@@ -20,14 +20,9 @@
 
 : 3drop   drop 2drop ;
 
-\ Determine whether two addresses point to different characters.
-: mismatch? ( caddr1 caddr2 -- caddr1 caddr2 flag )
-    2dup c@ swap c@ <>
-;
-
 \ Determine whether two strings start with same characters.
 : same-prefix? ( caddr1 u1 caddr2 u2 -- flag )
-    >r swap r> min             ( caddr1 caddr2 len )
+    >r swap r> min             ( caddr1 caddr2 minLen )
 
     \ If either string is empty, return false.
     dup 0= if
@@ -35,19 +30,7 @@
         false exit
     then
 
-    begin
-        dup 0>
-    while
-        >r                     ( caddr1 caddr2 ) ( R: len )
-        mismatch? if
-            2drop r> drop
-            false exit
-        then
-        char+ swap char+
-        r> 1-                  ( caddr2+1 caddr1+1 len-1 )
-    repeat
-    3drop
-    true
+    tuck compare 0=
 ;
 
 : comment-start? ( caddr u -- flag ) s" /****" same-prefix? ;

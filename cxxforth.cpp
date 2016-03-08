@@ -962,9 +962,9 @@ void unused() {
 
 /****
 
-I could implement memory-block words like `CMOVE`, `CMOVE>` and `FILL` in
-Forth, but speed is often important for these, so I will make them native
-primitives.
+I could implement memory-block words like `CMOVE`, `CMOVE>`, `FILL`, and
+`COMPARE` in Forth, but speed is often important for these, so I will make them
+native primitives.
 
 ****/
 
@@ -996,6 +996,32 @@ void fill() {
     auto length = SIZE_T(*dTop); pop();
     auto caddr = CHARPTR(*dTop); pop();
     std::fill(caddr, caddr + length, ch);
+}
+
+// COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
+void compare() {
+    REQUIRE_DSTACK_DEPTH(4, "COMPARE");
+    auto len2 = SIZE_T(*dTop); pop();
+    auto caddr2 = CHARPTR(*dTop); pop();
+    auto len1 = SIZE_T(*dTop); pop();
+    auto caddr1 = CHARPTR(*dTop);
+    auto minLen = std::min(len1, len2);
+    auto cmpResult = std::memcmp(caddr1, caddr2, minLen);
+    if (cmpResult < 0) {
+        *dTop = static_cast<Cell>(-1);
+    }
+    else if (cmpResult > 0) {
+        *dTop = static_cast<Cell>(1);
+    }
+    else if (len1 < len2) {
+        *dTop = static_cast<Cell>(-1);
+    }
+    else if (len1 > len2) {
+        *dTop = static_cast<Cell>(1);
+    }
+    else {
+        *dTop = 0;
+    }
 }
 
 /****
@@ -2567,6 +2593,7 @@ void definePrimitives() {
         {"cells",           cells},
         {"cmove",           cMove},
         {"cmove>",          cMoveUp},
+        {"compare",         compare},
         {"count",           count},
         {"cr",              cr},
         {"create",          create},
