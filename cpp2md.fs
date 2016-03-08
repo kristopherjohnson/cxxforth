@@ -1,21 +1,21 @@
 \ cpp2md.fs converts a C++ source file to a Markdown file.
-\ 
+\
 \ The rules it follows to do this are simple:
-\ 
+\
 \ - Text contained in lines between `/****` and `****/` are Markdown-format
 \   comments, and should be passed through as-is to the Markdown output file.
-\ 
+\
 \ - All other lines are C++, and should be indented four spaces so they are
 \   treated as code blocks.
-\ 
+\
 \ The `/****` and `****/` tokens must be at the initial position on the line.
-\ 
+\
 \ Invoke this script like this in the cxxforth source directory:
-\ 
+\
 \     build/cxxforth cpp2md.fs
-\ 
+\
 \ This script is also compatible with GForth:
-\ 
+\
 \     gforth cpp2md.fs
 
 : 3drop   drop 2drop ;
@@ -66,7 +66,7 @@ create lineBuf  #lineBuf 2 +  chars allot
     2dup comment-start? if
         false inCodeSection? !
     else
-        2dup comment-end? if 
+        2dup comment-end? if
             true inCodeSection? !
         else
             inCodeSection? @ if

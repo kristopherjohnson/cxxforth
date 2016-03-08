@@ -219,7 +219,7 @@ in case they have not been defined.
 
     
     #ifndef CXXFORTH_VERSION
-    #define CXXFORTH_VERSION "1.1.4"
+    #define CXXFORTH_VERSION "1.1.5"
     #endif
     
     #ifndef CXXFORTH_DATASPACE_SIZE
@@ -462,7 +462,7 @@ whenever writing numeric data using the stream operators.
     
     Cell numericBase = 10;
     
-    #define SETBASE() std::setbase(static_cast<int>(numericBase)) 
+    #define SETBASE() std::setbase(static_cast<int>(numericBase))
     
 
 The input buffer is a `std::string`.  This makes it easy to use the C++ I/O
@@ -607,7 +607,7 @@ standard words, I'll provide a brief description.
     }
     
     // ABORT-MESSAGE ( i*x c-addr u -- ) ( R: j*x -- )
-    // 
+    //
     // Not a standard word.
     //
     // Same semantics as the standard ABORT", but takes a string address and length
@@ -951,8 +951,10 @@ native primitives.
         auto caddr2 = CHARPTR(*dTop); pop();
         auto len1 = SIZE_T(*dTop); pop();
         auto caddr1 = CHARPTR(*dTop);
+    
         auto minLen = std::min(len1, len2);
         auto cmpResult = std::memcmp(caddr1, caddr2, minLen);
+    
         if (cmpResult < 0) {
             *dTop = static_cast<Cell>(-1);
         }
@@ -1087,7 +1089,7 @@ buffer.
 
     
     // ACCEPT ( c-addr +n1 -- +n2 )
-    void accept() { 
+    void accept() {
         REQUIRE_DSTACK_AVAILABLE(2, "ACCEPT");
     
         auto bufferSize = SIZE_T(*dTop); pop();
@@ -1176,7 +1178,7 @@ an address-length result.
     void parse() {
         REQUIRE_DSTACK_DEPTH(1, "PARSE");
         REQUIRE_DSTACK_AVAILABLE(1, "PARSE");
-        
+    
         auto delim = static_cast<char>(*dTop);
     
         parseBuffer.clear();
@@ -1358,7 +1360,7 @@ environmental data.
     }
     
     // SYSTEM ( c-addr u -- )
-    // 
+    //
     // Not a standard word.
     //
     // Executes a system command in a subshell.
@@ -1658,7 +1660,7 @@ names start and end with with parentheses.
     }
     
     // (branch) ( -- )
-    // 
+    //
     // Not a standard word.
     //
     // Used by branching/looping constructs.  Unconditionally adds an offset to
@@ -1671,7 +1673,7 @@ names start and end with with parentheses.
     }
     
     // (zbranch) ( flag -- )
-    // 
+    //
     // Not a standard word.
     //
     // Used by branching/looping constructinos.  Adds an offset to `next` if the
@@ -1956,7 +1958,7 @@ of the Forth text interpreter.
     // >NUM ( n c-addr1 u1 -- n c-addr2 u2 )
     //
     // Not a standard word.
-    // 
+    //
     // Similar to >UNUM, but looks for a '-' character at the beginning, and
     // negates the result if found.
     void parseSignedNumber() {
@@ -1964,7 +1966,7 @@ of the Forth text interpreter.
     
         auto length = SIZE_T(*dTop);
         auto caddr = CHARPTR(*(dTop - 1));
-        
+    
         if (length > 1 && *caddr == '-') {
             *dTop = static_cast<Cell>(length - 1);
             *(dTop - 1) = CELL(caddr + 1);
@@ -2797,7 +2799,7 @@ will jump over that data.
 Here are some common Forth words I can define now that I have control
 structures.
 
-        
+    
         ": ?dup       dup 0<> if dup then ;",
     
         ": abs        dup 0 < if negate then ;",
@@ -2995,7 +2997,7 @@ information.
         "      .\" by Kristopher Johnson\" cr",
         "      cr",
         "      .\" This is free and unencumbered software released into the public domain.\" cr",
-        "      cr",  
+        "      cr",
         "      .\" Anyone is free to copy, modify, publish, use, compile, sell, or distribute this\" cr",
         "      .\" software, either in source code form or as a compiled binary, for any purpose,\" cr",
         "      .\" commercial or non-commercial, and by any means.\" cr",
