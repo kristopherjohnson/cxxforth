@@ -21,15 +21,10 @@
 : 3drop   drop 2drop ;
 
 \ Determine whether two strings start with same characters.
+\ If either string is empty, return false.
 : same-prefix? ( caddr1 u1 caddr2 u2 -- flag )
     >r swap r> min             ( caddr1 caddr2 minLen )
-
-    \ If either string is empty, return false.
-    dup 0= if
-        3drop
-        false exit
-    then
-
+    dup 0= if nip nip exit then
     tuck compare 0=
 ;
 
@@ -65,16 +60,14 @@ create lineBuf  #lineBuf 2 +  chars allot
 : convert-line ( caddr length -- )
     2dup comment-start? if
         false inCodeSection? !
+    else 2dup comment-end? if
+        true inCodeSection? !
     else
-        2dup comment-end? if
-            true inCodeSection? !
-        else
-            inCodeSection? @ if
-                s"     " outFile @ write-file check-write
-            then
-            2dup outFile @ write-line check-write
+        inCodeSection? @ if
+            s"     " outFile @ write-file check-write
         then
-    then
+        2dup outFile @ write-line check-write
+    then then
     2drop
 ;
 
