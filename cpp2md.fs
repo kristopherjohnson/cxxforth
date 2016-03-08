@@ -51,10 +51,31 @@ variable inCodeSection? \ flag: Are we in a C++ section?
 create lineBuf  #lineBuf 2 +  chars allot
 
 \ Read next input line.
-\ Return ( caddr length true ) on success.
-\ Return ( caddr 0 false ) at end-of-file
-: get-input-line ( -- caddr length flag )
+\ Return ( caddr length -1 ) on success.
+\ Return ( 0 ) at end-of-file
+: get-input-line ( -- 0 | caddr length -1 )
     lineBuf dup #lineBuf inFile @ read-line check-read
+    dup 0= if nip nip then
+;
+
+\ Convert a line.
+\ If line starts with "/****" then set inCodeSection false.
+\ If line starts with "****/" then set inCodeSection true.
+\ Otherwise, output the line, indented if inCodeSection.
+: convert-line ( caddr length -- )
+    2dup comment-start? if
+        false inCodeSection? !
+    else
+        2dup comment-end? if 
+            true inCodeSection? !
+        else
+            inCodeSection? @ if
+                s"     " outFile @ write-file check-write
+            then
+            2dup outFile @ write-line check-write
+        then
+    then
+    2drop
 ;
 
 \ Perform the conversion described above.
@@ -62,24 +83,7 @@ create lineBuf  #lineBuf 2 +  chars allot
 \ the input file and output file.
 : convert-to-markdown ( -- )
     true inCodeSection? !
-    begin
-        get-input-line
-    while
-        2dup comment-start? if
-            false inCodeSection? !
-        else
-            2dup comment-end? if 
-                true inCodeSection? !
-            else
-                inCodeSection? @ if
-                    s"     " outFile @ write-file check-write
-                then
-                2dup outFile @ write-line check-write
-            then
-        then
-        2drop
-    repeat
-    2drop
+    begin get-input-line while convert-line repeat
 ;
 
 \ Main entry point
