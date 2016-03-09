@@ -18,27 +18,21 @@
 \
 \     gforth cpp2md.fs
 
-: 3drop   drop 2drop ;
+variable inFile  \ input file ID
+variable outFile \ output file ID
 
-\ Determine whether two strings start with same characters.
-\ If either string is empty, return false.
-: same-prefix? ( caddr1 u1 caddr2 u2 -- flag )
-    >r swap r> min             ( caddr1 caddr2 minLen )
-    dup 0= if nip nip exit then
-    tuck compare 0=
-;
+: check-input  ( ior -- )  abort" Unable to open input file" ;
+: check-read   ( ior -- )  abort" Read error" ;
+: open-input   ( -- )      s" cxxforth.cpp" r/o open-file check-input  inFile ! ;
+: close-input  ( -- )      inFile @  close-file drop ;
 
-: comment-start? ( caddr u -- flag ) s" /****" same-prefix? ;
-: comment-end?   ( caddr u -- flag ) s" ****/" same-prefix? ;
+: check-output ( ior -- )  abort" Unable to open output file" ;
+: check-write  ( ior -- )  abort" Write error" ;
+: open-output  ( -- )      s" cxxforth.cpp.md" r/w create-file check-output  outFile ! ;
+: close-output ( -- )      outFile @  close-file drop ;
 
-: check-input  ( ior -- ) abort" Unable to open input file" ;
-: check-output ( ior -- ) abort" Unable to open output file" ;
-: check-read   ( ior -- ) abort" Read error" ;
-: check-write  ( ior -- ) abort" Write error" ;
-
-variable inFile         \ input file ID
-variable outFile        \ output file ID
-variable inCodeSection? \ flag: Are we in a C++ section?
+: open-files   ( -- )      open-input open-output ;
+: close-files  ( -- )      close-input close-output ;
 
 \ Buffer for get-input-line.
 \ Actual size must be 2 characters larger than the usable size.
@@ -50,13 +44,24 @@ create lineBuf  #lineBuf 2 +  chars allot
 \ Return ( 0 ) at end-of-file
 : get-input-line ( -- 0 | caddr length -1 )
     lineBuf dup #lineBuf inFile @ read-line check-read
-    dup 0= if nip nip then
-;
+    dup 0= if nip nip then ;
+
+variable inCodeSection? \ flag: Are we in a C++ section?
+
+\ Determine whether two strings start with same characters.
+\ If either string is empty, return false.
+: same-prefix? ( caddr1 u1 caddr2 u2 -- flag )
+    >r swap r> min              ( caddr1 caddr2 minLen )
+    dup 0= if nip nip exit then
+    tuck compare 0= ;
+
+: comment-start? ( caddr u -- flag )  s" /****" same-prefix? ;
+: comment-end?   ( caddr u -- flag )  s" ****/" same-prefix? ;
 
 \ Convert a line.
-\ If line starts with "/****" then set inCodeSection false.
-\ If line starts with "****/" then set inCodeSection true.
-\ Otherwise, output the line, indented if inCodeSection.
+\ If line starts with "/****" then set inCodeSection? false.
+\ If line starts with "****/" then set inCodeSection? true.
+\ Otherwise, output the line, indented if inCodeSection? is true.
 : convert-line ( caddr length -- )
     2dup comment-start? if
         false inCodeSection? !
@@ -68,27 +73,17 @@ create lineBuf  #lineBuf 2 +  chars allot
         then
         2dup outFile @ write-line check-write
     then then
-    2drop
-;
+    2drop ;
 
-\ Perform the conversion described above.
+\ Convert all lines of the input file.
 \ inFile and outFile must already contain the file IDs of
 \ the input file and output file.
 : convert-to-markdown ( -- )
     true inCodeSection? !
-    begin get-input-line while convert-line repeat
-;
+    begin get-input-line while convert-line repeat ;
 
 \ Main entry point
-: go ( -- )
-    s" cxxforth.cpp" r/o open-file check-input inFile !
-    s" cxxforth.cpp.md" r/w create-file check-output outFile !
-
-    convert-to-markdown
-
-    inFile @ close-file drop
-    outFile @ close-file drop
-;
+: go ( -- )  open-files convert-to-markdown close-files ;
 
 go
 bye
