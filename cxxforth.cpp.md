@@ -2674,13 +2674,19 @@ Forth has a few words for incrementing/decrementing the top-of-stack value.
         ": c,   here  1 chars allot  c! ;",
     
 
+`ERASE` fills a region with zeros.
+
+        
+        ": erase  0 fill ;",
+    
+
 We have a few extended relational operators based upon the kernel's relational
 operators.  In a lower-level Forth system, these might have a one-to-one
 mapping to CPU opcodes, but in this system, they are just abbreviations.
 
     
-        ": >     2dup 2>r < 2r> = or invert ;",
-        ": u>    2dup 2>r u< 2r> = or invert ;",
+        ": >     swap < ;",
+        ": u>    swap u< ;",
         ": <>    = invert ;",
         ": 0<    0 < ;",
         ": 0>    0 > ;",
@@ -2784,9 +2790,9 @@ compilation point, then use `THEN` so that at runtime the inner interpreter
 will jump over that data.
 
     
-        ": if       ['] (zbranch) ,  here  0 , ; immediate",
+        ": if       ['] (zbranch) , here 0 , ; immediate",
         ": then     dup  here swap -  swap ! ; immediate",
-        ": else     ['] (branch) ,  here 0 ,  swap dup here swap -  swap ! ; immediate",
+        ": else     ['] (branch) , here 0 ,  swap dup here swap -  swap ! ; immediate",
         ": ahead    ['] (branch) , here 0 , ; immediate",
     
         ": begin    here ; immediate",
@@ -2800,12 +2806,12 @@ Here are some common Forth words I can define now that I have control
 structures.
 
     
-        ": ?dup       dup 0<> if dup then ;",
+        ": ?dup       dup if dup then ;",
     
         ": abs        dup 0 < if negate then ;",
     
-        ": max        2dup < if nip else drop then ;",
-        ": min        2dup < if drop else nip then ;",
+        ": max        2dup < if swap then drop ;",
+        ": min        2dup > if swap then drop ;",
     
         ": space      bl emit ;",
         ": spaces     begin  dup 0> while  space 1-  repeat  drop ;",
