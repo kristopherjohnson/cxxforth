@@ -225,7 +225,7 @@ in case they have not been defined.
 ****/
 
 #ifndef CXXFORTH_VERSION
-#define CXXFORTH_VERSION "1.1.5"
+#define CXXFORTH_VERSION "1.2.0"
 #endif
 
 #ifndef CXXFORTH_DATASPACE_SIZE
@@ -446,7 +446,7 @@ executed.  This will be explained below in the **Inner Interpreter** section.
 
 ****/
 
-Xt* next = nullptr;
+Xt* nextInstruction = nullptr;
 
 /****
 
@@ -1557,16 +1557,16 @@ anything to do with "returning".
 ****/
 
 void doColon() {
-    auto savedNext = next;
+    auto savedNext = nextInstruction;
 
     auto defn = Definition::executingWord;
 
-    next = reinterpret_cast<Xt*>(defn->does);
-    while (*next != exitXt) {
-        (*(next++))->execute();
+    nextInstruction = reinterpret_cast<Xt*>(defn->does);
+    while (*nextInstruction != exitXt) {
+        (*(nextInstruction++))->execute();
     }
 
-    next = savedNext;
+    nextInstruction = savedNext;
 }
 
 // EXIT ( -- ) ( R: nest-sys -- )
@@ -1674,7 +1674,7 @@ void doDoes() {
 void setDoes() {
     auto& latest = lastDefinition();
     latest.code = doDoes;
-    latest.does = AADDR(next) + 1;
+    latest.does = AADDR(nextInstruction) + 1;
 }
 
 // DOES>
@@ -1733,8 +1733,8 @@ names start and end with with parentheses.
 // to put on the stack during execution.
 void doLiteral() {
     REQUIRE_DSTACK_AVAILABLE(1, "(lit)");
-    push(CELL(*next));
-    ++next;
+    push(CELL(*nextInstruction));
+    ++nextInstruction;
 }
 
 // (branch) ( -- )
@@ -1746,8 +1746,8 @@ void doLiteral() {
 //
 // The offset is in character units, but must be a multiple of the cell size.
 void branch() {
-    auto offset = reinterpret_cast<SCell>(*next);
-    next += offset / static_cast<SCell>(CellSize);
+    auto offset = reinterpret_cast<SCell>(*nextInstruction);
+    nextInstruction += offset / static_cast<SCell>(CellSize);
 }
 
 // (zbranch) ( flag -- )
@@ -1764,7 +1764,7 @@ void zbranch() {
     if (flag == False)
         branch();
     else
-        ++next;
+        ++nextInstruction;
 }
 
 /****
