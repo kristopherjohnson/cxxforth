@@ -3,7 +3,7 @@ project(cxxforth)
 
 add_executable(cxxforth cxxforth.cpp)
 
-add_custom_target(cxxforth.cpp.md ALL build/cxxforth cpp2md.fs
+add_custom_target(cxxforth.cpp.md ALL cxxforth cpp2md.fs
     DEPENDS cxxforth.cpp cpp2md.fs
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generate cxxforth.cpp.md" VERBATIM

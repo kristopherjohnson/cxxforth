@@ -799,6 +799,12 @@ Forth names in the standards to learn what these words are supposed to do.
         push(*rTop);
     }
     
+    // EXIT ( -- ) ( R: nest-sys -- )
+    void exit() {
+        REQUIRE_RSTACK_DEPTH(1, "EXIT");
+        nextInstruction = reinterpret_cast<Xt*>(*rTop); rpop();
+    }
+    
 
 Another important set of Forth primitives are those for reading and writing
 values in data space.
@@ -1493,11 +1499,6 @@ anything to do with "returning".
         }
     
         nextInstruction = savedNext;
-    }
-    
-    // EXIT ( -- ) ( R: nest-sys -- )
-    void exit() {
-        throw runtime_error("EXIT should not be executed");
     }
     
 

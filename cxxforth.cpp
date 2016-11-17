@@ -847,6 +847,12 @@ void rFetch() {
     push(*rTop);
 }
 
+// EXIT ( -- ) ( R: nest-sys -- )
+void exit() {
+    REQUIRE_RSTACK_DEPTH(1, "EXIT");
+    nextInstruction = reinterpret_cast<Xt*>(*rTop); rpop();
+}
+
 /****
 
 Another important set of Forth primitives are those for reading and writing
@@ -1567,11 +1573,6 @@ void doColon() {
     }
 
     nextInstruction = savedNext;
-}
-
-// EXIT ( -- ) ( R: nest-sys -- )
-void exit() {
-    throw runtime_error("EXIT should not be executed");
 }
 
 /****
