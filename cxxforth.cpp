@@ -127,7 +127,7 @@ Running cxxforth
 Once the `cxxforth` executable is built, you can run it like any other command-line utility.
 
 If you run it without any additional arguments, it will display a welcome
-message and then aloow you to enter Forth commands.  Enter "bye" to exit.
+message and then allow you to enter Forth commands.  Enter "bye" to exit.
 
 If there are any additional arguments, cxxforth will load and interpret those
 files.  For example, the `cxxforth/tests` directory contains a file `hello.fs`
