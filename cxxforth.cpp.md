@@ -479,9 +479,9 @@ I need a buffer to store the result of the Forth `WORD` word.  As with the
 input buffer, I use a `string` so I don't need to worry about memory
 management.
 
-Note that while this is a `std:string`, its format is not a typical strings.
-The buffer returned by `WORD` has the word length as its first character.
-That is, it is a Forth _counted string_.
+Note that while this is a `std:string`, its format is not that of a typical C++
+string.  The buffer returned by `WORD` has the word length as its first
+character.  That is, it is a Forth _counted string_.
 
     
     string wordBuffer;
