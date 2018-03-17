@@ -2777,7 +2777,7 @@ put on the stack at runtime.
 Control Structures
 ------------------
 
-See the [Control Structures[jonesforthControlStructures] section of
+See the [Control Structures][jonesforthControlStructures] section of
 `jonesforth.f` for an explanation of how these words work.
 
 [jonesforthControlStructures]: http://git.annexia.org/?p=jonesforth.git;a=blob;f=jonesforth.f;h=5c1309574ae1165195a43250c19c822ab8681671;hb=HEAD#l118
