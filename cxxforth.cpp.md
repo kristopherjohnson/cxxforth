@@ -1138,7 +1138,7 @@ first byte, followed by the characters that made up the word.
 In a few places later in the C++ code, you will see the call sequence `bl();
 word(); count();`.  This corresponds to the Forth phrase `BL WORD COUNT`, which
 is how Forth code typically reads a space-delimited word from the input and
-get its address and length.
+gets its address and length.
 
 The standards specify that the `WORD` buffer must contain a space character
 after the character data, but I'm not going to worry about this obsolescent
