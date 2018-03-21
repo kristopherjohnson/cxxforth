@@ -177,6 +177,7 @@ those words and want a smaller executable.
     using std::cout;
     using std::endl;
     using std::exception;
+    using std::isspace;
     using std::ptrdiff_t;
     using std::runtime_error;
     using std::size_t;
@@ -219,7 +220,7 @@ in case they have not been defined.
 
     
     #ifndef CXXFORTH_VERSION
-    #define CXXFORTH_VERSION "1.2.0"
+    #define CXXFORTH_VERSION "1.3.0"
     #endif
     
     #ifndef CXXFORTH_DATASPACE_SIZE
@@ -1140,10 +1141,22 @@ word(); count();`.  This corresponds to the Forth phrase `BL WORD COUNT`, which
 is how Forth code typically reads a space-delimited word from the input and
 gets its address and length.
 
+If the delimiter is BL (space), then in addition to treating a space as the
+delimiter, we will treat any of the other standard C++ whitespace characters as
+a delimiter.  This allows us to process input indented with tabs or split
+across lines.  This behavior is allowed by the Forth standard.
+
 The standards specify that the `WORD` buffer must contain a space character
 after the character data, but I'm not going to worry about this obsolescent
 requirement.
 
+    
+    bool isWordDelimiterMatch(char delim, char c) {
+        if (delim == ' ')
+            return isspace(c);
+        else
+            return delim == c;
+    }
     
     // WORD ( char "<chars>ccc<char>" -- c-addr )
     void word() {
@@ -1156,11 +1169,11 @@ requirement.
         auto inputSize = sourceBuffer.size();
     
         // Skip leading delimiters
-        while (sourceOffset < inputSize && sourceBuffer[sourceOffset] == delim)
+        while (sourceOffset < inputSize && isWordDelimiterMatch(delim, sourceBuffer[sourceOffset]))
             ++sourceOffset;
     
-        // Copy characters until we see the delimiter again.
-        while (sourceOffset < inputSize && sourceBuffer[sourceOffset] != delim) {
+        // Copy characters until we see a delimiter again.
+        while (sourceOffset < inputSize && !isWordDelimiterMatch(delim, sourceBuffer[sourceOffset])) {
             wordBuffer.push_back(sourceBuffer[sourceOffset]);
             ++sourceOffset;
         }
