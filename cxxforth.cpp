@@ -1488,7 +1488,7 @@ void ms() {
 // TIME&DATE ( -- +n1 +n2 +n3 +n4 +n5 +n6 )
 void timeAndDate () {
     REQUIRE_DSTACK_AVAILABLE(6, "TIME&DATE");
-    auto t = std::time(0);
+    auto t = std::time(nullptr);
     auto tm = std::localtime(&t);
     push(static_cast<Cell>(tm->tm_sec));
     push(static_cast<Cell>(tm->tm_min));
@@ -1505,7 +1505,7 @@ void timeAndDate () {
 // Like TIME&DATE, but returns UTC rather than local time.
 void utcTimeAndDate () {
     REQUIRE_DSTACK_AVAILABLE(6, "UTCTIME&DATE");
-    auto t = std::time(0);
+    auto t = std::time(nullptr);
     auto tm = std::gmtime(&t);
     push(static_cast<Cell>(tm->tm_sec));
     push(static_cast<Cell>(tm->tm_min));
