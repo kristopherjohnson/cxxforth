@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/kristopherjohnson/cxxforth.svg?branch=master)](https://travis-ci.org/kristopherjohnson/cxxforth)
+
 cxxforth: A Simple Forth Implementation in C++
 ==============================================
 
