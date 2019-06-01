@@ -598,8 +598,10 @@ standard words, I'll provide a brief description.
     
     class AbortException: public runtime_error {
     public:
-        AbortException(const string& msg): runtime_error(msg) {}
-        AbortException(const char* msg): runtime_error(msg) {}
+        explicit AbortException(const string& msg): runtime_error(msg) {}
+        explicit AbortException(const char* msg): runtime_error(msg) {}
+        explicit AbortException(const char* caddr, size_t count)
+            : runtime_error(string(caddr, count)) {}
     };
     
     // ABORT ( i*x -- ) ( R: j*x -- )
@@ -616,8 +618,7 @@ standard words, I'll provide a brief description.
     void abortMessage() {
         auto count = SIZE_T(*dTop); pop();
         auto caddr = CHARPTR(*dTop); pop();
-        string message(caddr, count);
-        throw AbortException(message);
+        throw AbortException(caddr, count);
     }
     
 
@@ -2690,7 +2691,7 @@ Forth has a few words for incrementing/decrementing the top-of-stack value.
 
 `ERASE` fills a region with zeros.
 
-        
+    
         ": erase  0 fill ;",
     
 
