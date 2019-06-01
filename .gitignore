@@ -5,4 +5,4 @@ build
 build_optimized
 tags
 xcuserdata
-
+.vscode
