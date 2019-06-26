@@ -226,7 +226,7 @@ in case they have not been defined.
 ****/
 
 #ifndef CXXFORTH_VERSION
-#define CXXFORTH_VERSION "1.3.0"
+#define CXXFORTH_VERSION "1.4.0"
 #endif
 
 #ifndef CXXFORTH_DATASPACE_SIZE
@@ -806,6 +806,12 @@ void depth() {
 void drop() {
     REQUIRE_DSTACK_DEPTH(1, "DROP");
     pop();
+}
+
+// SWAP ( x0 x1 -- x1 x0 )
+void swap() {
+    REQUIRE_DSTACK_DEPTH(2, "SWAP");
+    std::swap(*dTop, *(dTop - 1));
 }
 
 // PICK ( xu ... x1 x0 u -- xu ... x1 x0 xu )
@@ -2644,6 +2650,7 @@ void definePrimitives() {
         {"see",             see},
         {"source",          source},
         {"state",           state},
+        {"swap",            swap},
         {"system",          system},
         {"time&date",       timeAndDate},
         {"type",            type},
@@ -2725,7 +2732,6 @@ operations, double-cell stack operations are still useful.
 
     ": dup     0 pick ;",
     ": over    1 pick ;",
-    ": swap    1 roll ;",
     ": rot     2 roll ;",
     ": nip     swap drop ;",
     ": tuck    swap over ;",
