@@ -3151,8 +3151,7 @@ on each line to load them into the system.
     }
     
 
-Finally we have our `main()`. If there are no command-line arguments, it prints
-a banner and help message. Then it calls `cxxforth_main()`.
+Finally we have our `main()`, which simply calls `cxxforth_main()`.
 
 You can define the macro `CXXFORTH_NO_MAIN` to inhibit generation of `main()`.
 This is useful for incorporating `cxxforth.cpp` into another application or
