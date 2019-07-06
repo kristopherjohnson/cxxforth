@@ -808,6 +808,12 @@ void drop() {
     pop();
 }
 
+// DUP ( x -- x x )
+void dup() {
+    REQUIRE_DSTACK_DEPTH(1, "DUP");
+    push(*dTop);
+}
+
 // SWAP ( x0 x1 -- x1 x0 )
 void swap() {
     REQUIRE_DSTACK_DEPTH(2, "SWAP");
@@ -2622,6 +2628,7 @@ void definePrimitives() {
         {"create",          create},
         {"depth",           depth},
         {"drop",            drop},
+        {"dup",             dup},
         {"emit",            emit},
         {"evaluate",        evaluate},
         {"execute",         execute},
@@ -2730,7 +2737,6 @@ operations, double-cell stack operations are still useful.
 
 ****/
 
-    ": dup     0 pick ;",
     ": over    1 pick ;",
     ": rot     2 roll ;",
     ": nip     swap drop ;",

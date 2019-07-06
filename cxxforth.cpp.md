@@ -760,6 +760,12 @@ Forth names in the standards to learn what these words are supposed to do.
         pop();
     }
     
+    // DUP ( x -- x x )
+    void dup() {
+        REQUIRE_DSTACK_DEPTH(1, "DUP");
+        push(*dTop);
+    }
+    
     // SWAP ( x0 x1 -- x1 x0 )
     void swap() {
         REQUIRE_DSTACK_DEPTH(2, "SWAP");
@@ -2528,6 +2534,7 @@ working system.
             {"create",          create},
             {"depth",           depth},
             {"drop",            drop},
+            {"dup",             dup},
             {"emit",            emit},
             {"evaluate",        evaluate},
             {"execute",         execute},
@@ -2632,7 +2639,6 @@ Note that while I'm not implementing any of the Forth double-cell arithmetic
 operations, double-cell stack operations are still useful.
 
     
-        ": dup     0 pick ;",
         ": over    1 pick ;",
         ": rot     2 roll ;",
         ": nip     swap drop ;",
