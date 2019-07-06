@@ -226,7 +226,7 @@ in case they have not been defined.
 ****/
 
 #ifndef CXXFORTH_VERSION
-#define CXXFORTH_VERSION "1.4.0"
+#define CXXFORTH_VERSION "1.4.1"
 #endif
 
 #ifndef CXXFORTH_DATASPACE_SIZE
@@ -1003,9 +1003,15 @@ void cMoveUp() {
     auto length = SIZE_T(*dTop); pop();
     auto dst = CHARPTR(*dTop); pop();
     auto src = CHARPTR(*dTop); pop();
-    for (size_t i = 0; i < length; ++i) {
-        auto offset = length - i - 1;
-        *(src + offset) = *(dst + offset);
+    if (length > 0) {
+        auto offset = length - 1;
+        for (;;)
+        {
+            *(dst + offset) = *(src + offset);
+            if (offset == 0)
+                break;
+            offset--;
+        }
     }
 }
 
