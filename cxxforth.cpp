@@ -811,6 +811,7 @@ void drop() {
 // DUP ( x -- x x )
 void dup() {
     REQUIRE_DSTACK_DEPTH(1, "DUP");
+    REQUIRE_DSTACK_AVAILABLE(1, "DUP");
     push(*dTop);
 }
 

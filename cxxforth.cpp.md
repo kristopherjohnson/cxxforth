@@ -763,6 +763,7 @@ Forth names in the standards to learn what these words are supposed to do.
     // DUP ( x -- x x )
     void dup() {
         REQUIRE_DSTACK_DEPTH(1, "DUP");
+        REQUIRE_DSTACK_AVAILABLE(1, "DUP");
         push(*dTop);
     }
     
